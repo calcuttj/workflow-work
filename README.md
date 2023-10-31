@@ -12,7 +12,7 @@
     --dry_run               Will spit out what will be run
 </pre>
 
-## PDSP NTuples
+## PDSP MC NTuples
 The script can be used to create ProtoDUNE-SP ntuples. Relevant samweb definition include `PDSPProd4a_MC_1GeV_reco1_sce_datadriven_v1_0X` where `X` ranges [0, 9].
 
 Get the `Nth` file (0-indexed) from the given samweb definition as follows:
