@@ -1,0 +1,12 @@
+touch filelist.txt
+for i in `seq 1 ${NFILES:-1}`; do
+  echo $i
+  THISFILE=`$JUSTIN_PATH/justin-get-file | cut -f2 -d' '`
+  echo $THISFILE
+  echo $THISFILE >> filelist.txt
+done
+
+echo "File list"
+cat filelist.txt
+exit 0
+
