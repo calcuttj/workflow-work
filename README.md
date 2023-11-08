@@ -1,39 +1,41 @@
 # Generic Script
-`generic_script.sh` can run `lar` on a fresh setup using various fcl files and on various samples (data or MC).
-
-<pre>
-  Usage: ./generic_script.sh -c FCL_FILE [optional flags] INPUT_FILE
-  Optional flags:
-    -n, --nevents NEVENTS   Controls number of events, default == -1 (all)
-    -o OUTPUT_FILE          Output file name
-    --ntuple                Required when creating ntuples
-    --nosetup               Use when you don't want to setup dunesw (i.e. for testing)
-    --samweb                Tells the script to get the xrootd URI from samweb
-    --dry_run               Will spit out what will be run
-</pre>
+`generic.jobscript` can run `lar` using various fcl files and on various samples (data or MC from PDHD or PDSP).
 
 ## PDSP MC NTuples
-The script can be used to create ProtoDUNE-SP ntuples. Relevant samweb definition include `PDSPProd4a_MC_1GeV_reco1_sce_datadriven_v1_0X` where `X` ranges [0, 9].
-
-Get the `Nth` file (0-indexed) from the given samweb definition as follows:
+### MQL
 <pre>
-  samweb list-files defname:PDSPProd4a_MC_1GeV_reco1_sce_datadriven_v1_00 with limit 1 with offset N
+workflow$ metacat query -s "files from dune:all where core.file_type=mc and core.data_tier=full-reconstructed and art.run_type=protodune-sp and dune.requestid=RITM1115963 and mc.space_charge=yes"
+Files:        83648
+Total size:   161124291092849 (161.124 TB)
 </pre>
 
-From a fresh login, `lar` can be run with the `pduneana_Prod4a_MC_sce.fcl` fcl file for NEVENTS on a given file (with its full path) as:
-<pre>
-  ./generic_script.sh -c pduneana_Prod4a_MC_sce.fcl -n NEVENTS --ntuple -o OUTPUT_FILE --samweb FILE_FROM_SAM
-</pre>
+### FCL
+`pduneana_Prod4a_MC_sce.fcl`
+
+### Required options
+`NTUPLE=1` -- controls which output flag (NTUPLE: `-T` or default: `-o`) is used.
 
 ## PDSP Data Keepup
-Get a raw PDSP data file (add `with offset N` to get the `Nth` file from the run)
+### MQL
 <pre>
-  samweb list-files 'run_number 5387 and run_type protodune-sp and data_tier raw' with limit 1
+workflow$ metacat query -s "files from dune:all where core.file_type=detector and core.data_tier=raw and core.run_type=protodune-sp"
+Files:        922532
+Total size:   4717153167566366 (4717.153 TB)
 </pre>
 
-Use `protoDUNE_SP_keepup_decoder_reco.fcl` to process the raw data:
+### FCL
+`protoDUNE_SP_keepup_decoder_reco.fcl`
+
+## PDHP Data Keepup
+### MQL
 <pre>
-  ./generic_script.sh -c protoDUNE_SP_keepup_decoder_reco.fcl --samweb -n NEVENTS -o OUTPUT_FILE FILE_FROM_SAM
+workflow$ metacat query -s "files from dune:all where core.file_type=detector and core.data_tier=raw and 22949 in core.runs"
+Files:        16
+Total size:   66927584048 (66.928 GB)
 </pre>
 
-## PDSP MC Reco
+### FCL
+`runpdhdwibethtpcdecoder.fcl`
+
+### Required options
+`HDF5JOB=1` -- Tells the job to run in a subshell with LD_PRELOAD set so hdf5 can be streamed via xrootd
