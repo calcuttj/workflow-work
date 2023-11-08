@@ -13,7 +13,7 @@ Total size:   161124291092849 (161.124 TB)
 `pduneana_Prod4a_MC_sce.fcl`
 
 ### Required options
-`NTUPLE=1` -- controls which output flag (NTUPLE: `-T` or default: `-o`) is used.
+`--env NTUPLE=1` -- controls which output flag (NTUPLE: `-T` or default: `-o`) is used.
 
 ## PDSP Data Keepup
 ### MQL
@@ -38,4 +38,4 @@ Total size:   66927584048 (66.928 GB)
 `runpdhdwibethtpcdecoder.fcl`
 
 ### Required options
-`HDF5JOB=1` -- Tells the job to run in a subshell with LD_PRELOAD set so hdf5 can be streamed via xrootd
+`--env HDF5JOB=1` -- Tells the job to run in a subshell with LD_PRELOAD set so hdf5 can be streamed via xrootd
