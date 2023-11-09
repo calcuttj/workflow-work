@@ -1,5 +1,24 @@
 # Generic Script
 `generic.jobscript` can run `lar` using various fcl files and on various samples (data or MC from PDHD or PDSP).
+### Test command
+<pre>justin-test-jobscript --mql &lt;MQL_REQUEST&gt; --jobscript generic.jobscript
+</pre>
+
+### Optional environment variables
+`--env NEVENTS` -- controls how many events to parse (default -1/all)
+
+`--env NFILES` -- controls how many files to go through (default 1)
+
+`--env FCLFILE` -- controls which fcl file to use (default `pduneana_Prod4a_MC_sce.fcl`)
+
+`--env OUTPREFIX` -- controls prefix to output file (default `duneana_ntuple`) 
+
+`--env DUNE_VERSION` -- controls which version of dunesw to use (default `v09_79_00d00`)
+
+`--env DUNE_QUALIFIER` -- controls which qualifiers of dunesw to use (default `e26:prof`)
+
+
+
 
 ## PDSP MC NTuples
 ### MQL
