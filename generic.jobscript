@@ -35,7 +35,15 @@ setup dunesw \
    -q "${DUNE_QUALIFIER:-e26:prof}"
 
 echo "Will use justin-get-file"
-FILE=`$JUSTIN_PATH/justin-get-file | cut -f2 -d' '`
+
+touch filelist.txt
+for i in `seq 1 ${NFILES:-1}`; do
+  echo $i
+  THISFILE=`$JUSTIN_PATH/justin-get-file | cut -f2 -d' '`
+  echo $THISFILE
+  echo $THISFILE >> filelist.txt
+done
+#FILE=`$JUSTIN_PATH/justin-get-file | cut -f2 -d' '`
 
 now=$(date -u +"%Y-%m-%dT_%H%M%SZ")
 OUTFILE="${OUTPREFIX:-duneana_ntuple}.${JUSTIN_REQUEST_ID}"
@@ -49,26 +57,24 @@ else
   OUTFLAG="-T"
 fi
 
+#echo "Running on $FILE"
+
 if [ -z $HDF5JOB ]; then
   lar -c "${FCLFILE:-pduneana_Prod4a_MC_sce.fcl}" \
       "$OUTFLAG" "$OUTFILE.root" \
       -n "${NEVENTS:--1}" \
-      "$FILE" >$OUTFILE.log 2>&1
+      -S filelist.txt >$OUTFILE.log 2>&1
+      #"$FILE" >$OUTFILE.log 2>&1
 else
   (
   export LD_PRELOAD=${XROOTD_LIB}/libXrdPosixPreload.so
   lar -c "${FCLFILE:-pduneana_Prod4a_MC_sce.fcl}" \
       "$OUTFLAG" "$OUTFILE.root" \
       -n "${NEVENTS:--1}" \
-      "$FILE" >$OUTFILE.log 2>&1
+      -S filelist.txt >$OUTFILE.log 2>&1
+      #"$FILE" >$OUTFILE.log 2>&1
   )
 fi
-
-#ls ${XROOTD_LIB}/libXrdPosixPreload.so
-#lar -c "${FCLFILE:-pduneana_Prod4a_MC_sce.fcl}" \
-#    "$OUTFLAG" "$OUTFILE.root" \
-#    -n "${NEVENTS:--1}" \
-#    "$FILE" >$OUTFILE.log 2>&1
 
 larExit=$?
 echo "lar exit code $larExit"
