@@ -37,17 +37,25 @@ setup dunesw \
 echo "Will use justin-get-file"
 
 touch filelist.txt
+touch didlist.txt
 for i in `seq 1 ${NFILES:-1}`; do
   echo $i
-  THISFILE=`$JUSTIN_PATH/justin-get-file | cut -f2 -d' '`
-  echo $THISFILE
-  echo $THISFILE >> filelist.txt
+  FULLFILE=`$JUSTIN_PATH/justin-get-file`
+  #THISFILE=`$JUSTIN_PATH/justin-get-file | cut -f2 -d' '`
+  THISPFN=`echo $FULLFILE | cut -f2 -d' '`
+  THISDID=`echo $FULLFILE | cut -f2 -d' '`
+  echo $THISPFN
+  echo $THISPFN >> filelist.txt
+
+  echo $THISDID
+  echo $THISDID >> didlist.txt
 done
 #FILE=`$JUSTIN_PATH/justin-get-file | cut -f2 -d' '`
 
 now=$(date -u +"%Y-%m-%dT_%H%M%SZ")
 OUTFILE="${OUTPREFIX:-duneana_ntuple}.${JUSTIN_REQUEST_ID}"
 OUTFILE="$OUTFILE.$JUSTIN_JOBSUB_ID.${now}"
+OUTFILE=`echo $OUTFILE | sed -e 's/@/./'`
 
 if [ -z $NTUPLE ]; then
   echo "asdf"
@@ -81,12 +89,17 @@ echo "lar exit code $larExit"
 
 if [ $larExit -eq 0 ] ; then
   # Success !
-  echo "$FILE" > justin-processed-pfns.txt
+  #echo "$FILE" > justin-processed-pfns.txt
+  cat filelist.txt > justin-processed-pfns.txt
   jobscriptExit=0
 else
   # Oh :(
   jobscriptExit=1
 fi
+
+#echo "EXTRACTING METADATA"
+#python $INPUT_TAR_DIR_LOCAL/extract_metadata.py --files `cat didlist.txt` -o "$OUTFILE.root.json" --tier raw 
+#cat "$OUTFILE.root.json"
 
 # Put last 100 lines of lar log into the HTCondor and Jobscript logs    
 tail -100 $OUTFILE.log
