@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+source /cvmfs/dune.opensciencegrid.org/products/dune/setup_dune.sh
+
+##TODO -- write usage
+DETECTOR="${DETPROD:-HD}"
+HC="${HCPROD:-FHC}"
+
+if [ "${DETECTOR}" = "HD" ] && ["$HC" = "FHC"]; then
+elif [ "${DETECTOR}" = "HD" ] && ["$HC" = "RHC"]; then
+if [ "${DETECTOR}" = "VD" ] && ["$HC" = "FHC"]; then
+elif [ "${DETECTOR}" = "VD" ] && ["$HC" = "RHC"]; then
+else
+  echo "NEED TO REQUEST EITHER HD OR VD. USER REQUESTED ${DETECTOR}"
+  exit 1
+fi
+
+
+#Setup recent lar software suite
+setup dunesw \
+   "${DUNE_VERSION:-v09_81_00d02}" \
+   -q "${DUNE_QUALIFIER:-e26:prof}"
+
+echo "Will use justin-get-file"
+
+FILE=`$JUSTIN_PATH/justin-get-file | cut -f2 -d' '`
+
+
+now=$(date -u +"%Y-%m-%dT_%H%M%SZ")
+OUTFILE="${OUTPREFIX:-duneana_ntuple}.${JUSTIN_REQUEST_ID}"
+OUTFILE="$OUTFILE.$JUSTIN_JOBSUB_ID.${now}"
+OUTFILE=`echo $OUTFILE | sed -e 's/@/./'`
+
+###Run reco2
+lar -c "${RECOFCL}" \
+    #-o "$OUTFILE.root" \ # --- ouput file is determined from input file + reco added on
+    -n "${NEVENTS:--1}" \
+    "$FILE" >$OUTFILE.log 2>&1
+
+
+larExit=$?
+echo "Reco step lar exit code $larExit"
+
+if [ $larExit -eq 0 ] ; then
+  # Success !
+  # Log the file for justin and move on to the next step
+  echo "$FILE" > justin-processed-pfns.txt
+else
+  # Error -- exit immediately 
+  jobscriptExit=1
+  tail -100 $OUTFILE.log
+  exit $jobscriptExit
+fi
+
+###Run ana 
+lar -c "${ANAFCL}" \
+    -n "${NEVENTS:--1}" \
+    "$FILE" >$OUTFILE.log 2>&1 ##TODO -- Need to replace the File here
+
+
+larExit=$?
+echo "Reco step lar exit code $larExit"
+
+if [ $larExit -eq 0 ] ; then
+  # Success !
+  # Log the file for justin and move on to the next step
+  echo "$FILE" > justin-processed-pfns.txt
+else
+  # Error -- exit immediately 
+  jobscriptExit=1
+  tail -100 $OUTFILE.log
+  exit $jobscriptExit
+fi
