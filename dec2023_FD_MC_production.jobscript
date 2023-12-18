@@ -3,12 +3,11 @@
 source /cvmfs/dune.opensciencegrid.org/products/dune/setup_dune.sh
 
 ##TODO -- write usage
+
+
+
 DETECTOR="${DETPROD:-HD}"
 HC="${HCPROD:-FHC}"
-
-##TODO -- check HC is FHC or RHC 
-#if [ ]
-
 
 ## Build up the fcls to use
 if [ "${DETECTOR}" = "HD" ]; then
@@ -48,20 +47,57 @@ echo "Will use justin-get-file"
 FILE=`$JUSTIN_PATH/justin-get-file | cut -f2 -d' '`
 #
 #
-#now=$(date -u +"%Y-%m-%dT_%H%M%SZ")
-OUTFILE="${OUTPREFIX:-fd_mc_prod_test}.${JUSTIN_REQUEST_ID}"
-OUTFILE="$OUTFILE.$JUSTIN_JOBSUB_ID.${now}"
-OUTFILE=`echo $OUTFILE | sed -e 's/@/./'`
+now=$(date -u +"%Y-%m-%dT_%H%M%SZ")
+#OUTFILE="${OUTPREFIX:-fd_mc_prod_test}.${JUSTIN_REQUEST_ID}"
+#OUTFILE="$OUTFILE.$JUSTIN_JOBSUB_ID.${now}"
+#OUTFILE=`echo $OUTFILE | sed -e 's/@/./'`
 #
 ####Run reco2
 lar -c "${RECOFCL}" \
-    -o "$OUTFILE.root" \ # --- ouput file is determined from input file + reco added on
     -n "${NEVENTS:--1}" \
-    "$FILE" >$OUTFILE.log 2>&1
-
+    "$FILE" >reco2.log 2>&1
+    #-o "$OUTFILE.root" \
+    #-n "${NEVENTS:--1}" \
+    #"$FILE" >$OUTFILE.log 2>&1
 
 larExit=$?
 echo "Reco step lar exit code $larExit"
+
+if [ $larExit -eq 0 ] ; then
+  # Success !
+  # Log the file for justin and move on to the next step
+  #echo "$FILE" > justin-processed-pfns.txt
+  echo "Moving on to analysis "
+else
+  # Error -- exit immediately 
+  jobscriptExit=1
+  tail -100 reco2.log
+  exit $jobscriptExit
+fi
+
+ORIG_OUTFILE=`ls *reco2.root`
+OUTFILE=`echo "${ORIG_OUTFILE}_${now}_reco2" | sed -e 's/reco2.root//'`
+
+mv ${ORIG_OUTFILE} ${OUTFILE}.root
+
+##If running VD, there will also be pandora files. Rename these
+if [ "${DETECTOR}" = "VD" ]; then
+  mv Validation.root "${OUTFILE}_Validation.root"
+  mv Pandora_Events.pndr "${OUTFILE}_Pandora_Events.pndr"
+fi
+
+ANAOUTFILE="${OUTFILE}_ana"
+echo "Will output ana to $ANAOUTFILE"
+
+###Run ana 
+lar -c "${ANAFCL}" \
+    -n "${NEVENTS:--1}" \
+    -T "$ANAOUTFILE.root" \
+    "$OUTFILE.root" >ana.log 2>&1
+
+
+larExit=$?
+echo "Ana step lar exit code $larExit"
 
 if [ $larExit -eq 0 ] ; then
   # Success !
@@ -70,27 +106,9 @@ if [ $larExit -eq 0 ] ; then
 else
   # Error -- exit immediately 
   jobscriptExit=1
-  tail -100 $OUTFILE.log
+  tail -100 ana.log
   exit $jobscriptExit
 fi
-#
-####Run ana 
-#lar -c "${ANAFCL}" \
-#    -n "${NEVENTS:--1}" \
-#    "$FILE" >$OUTFILE.log 2>&1 ##TODO -- Need to replace the File here
-#
-#
-#larExit=$?
-#echo "Reco step lar exit code $larExit"
-#
-#if [ $larExit -eq 0 ] ; then
-#  # Success !
-#  # Log the file for justin and move on to the next step
-#  echo "$FILE" > justin-processed-pfns.txt
-#else
-#  # Error -- exit immediately 
-#  jobscriptExit=1
-#  tail -100 $OUTFILE.log
-#fi
 
+ls
 exit $jobscriptExit
