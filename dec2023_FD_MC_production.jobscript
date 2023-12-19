@@ -41,13 +41,18 @@ echo "and Ana fcl: ${ANAFCL}"
 setup dunesw \
    "${DUNE_VERSION:-v09_81_00d02}" \
    -q "${DUNE_QUALIFIER:-e26:prof}"
+setup metacat
+
 #
 echo "Will use justin-get-file"
 #
-FILE=`$JUSTIN_PATH/justin-get-file | cut -f2 -d' '`
+DID_PFN_RSE=`$JUSTIN_PATH/justin-get-file`
+FILE=`echo ${DID_PFN_RSE} | cut -f2 -d' '`
+DID=`echo ${DID_PFN_RSE} | cut -f1 -d' '`
+echo "DID: ${DID}"
 #
 #
-now=$(date -u +"%Y-%m-%dT_%H%M%SZ")
+now=$(date -u +"%Y%m%dT%H%M%SZ")
 #OUTFILE="${OUTPREFIX:-fd_mc_prod_test}.${JUSTIN_REQUEST_ID}"
 #OUTFILE="$OUTFILE.$JUSTIN_JOBSUB_ID.${now}"
 #OUTFILE=`echo $OUTFILE | sed -e 's/@/./'`
@@ -80,11 +85,54 @@ OUTFILE=`echo "${ORIG_OUTFILE}_${now}_reco2" | sed -e 's/reco2.root//'`
 
 mv ${ORIG_OUTFILE} ${OUTFILE}.root
 
+### Get the metadata
+##TODO -- convert this is the right file extensions
+extractor_prod.py --infile ${OUTFILE}.root --campaign fd_mc_2023a \
+                  --requestid ritm1780305 --no_crc > ${OUTFILE}.root.json
+extractorExit=$?
+if [ $extractorExit -eq 0 ] ; then
+  # Success !
+  echo "Extracted metadata"
+else
+  # Error -- exit immediately 
+  jobscriptExit=1
+  echo "Failed to extract md"
+  exit $jobscriptExit
+fi
+
+### Convert the metadata to metacat
+##TODO -- make sure the RCDS behavior is correct
+python $INPUT_TAR_DIR_LOCAL/convert_metadata.py -i ${OUTFILE}.root.json
+converterExit=$?
+if [ $converterExit -eq 0 ] ; then
+  # Success !
+  echo "Converted metadata"
+else
+  # Error -- exit immediately 
+  jobscriptExit=1
+  echo "Failed to convert md"
+  exit $jobscriptExit
+fi
+
 ##If running VD, there will also be pandora files. Rename these
 if [ "${DETECTOR}" = "VD" ]; then
   mv Validation.root "${OUTFILE}_Validation.root"
   mv Pandora_Events.pndr "${OUTFILE}_Pandora_Events.pndr"
 fi
+
+##Copy over the metadata for pndr
+##Edit the fields corresepondingly
+sed ${OUTFILE}.root.json -e 's/full-reconstructed/pandora-info/' > ${OUTFILE}_Pandora_Events.pndr.json
+sed -i ${OUTFILE}_Pandora_Events.pndr.json -e 's/artroot/binary/' #> ${OUTFILE}_Pandora_Events.pndr.json
+sed -i ${OUTFILE}_Pandora_Events.pndr.json -e '/art.file_format/d'
+#sed -i ${OUTFILE}_Pandora_Events.pndr.json -e '/art.file_format/d'
+
+##Copy over the metadata for validation.root 
+##Edit the fields corresepondingly
+sed ${OUTFILE}.root.json -e 's/full-reconstructed/pandora-info/' > ${OUTFILE}_Validation.root.json
+sed -i ${OUTFILE}_Validation.root.json -e 's/artroot/root/' #> ${OUTFILE}_Validation.root.json
+sed -i ${OUTFILE}_Validation.root.json -e '/art.file_format/d'
+#sed -i ${OUTFILE}_Validation.root.json -e '/art.file_format/d'
 
 ANAOUTFILE="${OUTFILE}_ana"
 echo "Will output ana to $ANAOUTFILE"
@@ -109,6 +157,12 @@ else
   tail -100 ana.log
   exit $jobscriptExit
 fi
+
+sed ${OUTFILE}.root.json -e 's/full-reconstructed/root-tuple-virtual/' > ${ANAOUTFILE}.root.json
+sed -i ${ANAOUTFILE}.root.json -e 's/artroot/root/'
+sed -i ${ANAOUTFILE}.root.json -e '/art.file_format/d'
+sed -i ${ANAOUTFILE}.root.json -e '/art.process/d'
+#sed -i ${ANAOUTFILE}.root.json -e '/art.file_format/d'
 
 ls
 exit $jobscriptExit
