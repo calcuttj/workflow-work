@@ -118,21 +118,21 @@ fi
 if [ "${DETECTOR}" = "VD" ]; then
   mv Validation.root "${OUTFILE}_Validation.root"
   mv Pandora_Events.pndr "${OUTFILE}_Pandora_Events.pndr"
+
+  ##Copy over the metadata for pndr
+  ##Edit the fields corresepondingly
+  sed ${OUTFILE}.root.json -e 's/full-reconstructed/pandora-info/' > ${OUTFILE}_Pandora_Events.pndr.json
+  sed -i ${OUTFILE}_Pandora_Events.pndr.json -e 's/artroot/binary/' #> ${OUTFILE}_Pandora_Events.pndr.json
+  sed -i ${OUTFILE}_Pandora_Events.pndr.json -e '/art.file_format/d'
+  #sed -i ${OUTFILE}_Pandora_Events.pndr.json -e '/art.file_format/d'
+  
+  ##Copy over the metadata for validation.root 
+  ##Edit the fields corresepondingly
+  sed ${OUTFILE}.root.json -e 's/full-reconstructed/pandora-info/' > ${OUTFILE}_Validation.root.json
+  sed -i ${OUTFILE}_Validation.root.json -e 's/artroot/root/' #> ${OUTFILE}_Validation.root.json
+  sed -i ${OUTFILE}_Validation.root.json -e '/art.file_format/d'
+  #sed -i ${OUTFILE}_Validation.root.json -e '/art.file_format/d'
 fi
-
-##Copy over the metadata for pndr
-##Edit the fields corresepondingly
-sed ${OUTFILE}.root.json -e 's/full-reconstructed/pandora-info/' > ${OUTFILE}_Pandora_Events.pndr.json
-sed -i ${OUTFILE}_Pandora_Events.pndr.json -e 's/artroot/binary/' #> ${OUTFILE}_Pandora_Events.pndr.json
-sed -i ${OUTFILE}_Pandora_Events.pndr.json -e '/art.file_format/d'
-#sed -i ${OUTFILE}_Pandora_Events.pndr.json -e '/art.file_format/d'
-
-##Copy over the metadata for validation.root 
-##Edit the fields corresepondingly
-sed ${OUTFILE}.root.json -e 's/full-reconstructed/pandora-info/' > ${OUTFILE}_Validation.root.json
-sed -i ${OUTFILE}_Validation.root.json -e 's/artroot/root/' #> ${OUTFILE}_Validation.root.json
-sed -i ${OUTFILE}_Validation.root.json -e '/art.file_format/d'
-#sed -i ${OUTFILE}_Validation.root.json -e '/art.file_format/d'
 
 ANAOUTFILE="${OUTFILE}_ana"
 echo "Will output ana to $ANAOUTFILE"
