@@ -41,12 +41,27 @@ echo "and Ana fcl: ${ANAFCL}"
 setup dunesw \
    "${DUNE_VERSION:-v09_81_00d02}" \
    -q "${DUNE_QUALIFIER:-e26:prof}"
-setup metacat
 
 #
 echo "Will use justin-get-file"
 #
 DID_PFN_RSE=`$JUSTIN_PATH/justin-get-file`
+#getfileExit=$?
+
+#if [ $getfileExit -ne 0 ] ; then
+#  # Success !
+#  # Error -- exit immediately 
+#  jobscriptExit=1
+#  echo "Error in justin-get-file"
+#  exit $jobscriptExit
+#fi
+
+##Check that any file was returned
+if [ "$did_pfn_rse" != "" ] ; then
+  echo "Could not get file"
+  exit 0
+fi
+
 FILE=`echo ${DID_PFN_RSE} | cut -f2 -d' '`
 DID=`echo ${DID_PFN_RSE} | cut -f1 -d' '`
 echo "DID: ${DID}"
@@ -87,7 +102,7 @@ mv ${ORIG_OUTFILE} ${OUTFILE}.root
 
 ### Get the metadata
 ##TODO -- convert this is the right file extensions
-extractor_prod.py --infile ${OUTFILE}.root --campaign fd_mc_2023a \
+extractor_prod.py --infile ${OUTFILE}.root --campaign ${CAMPAIGN:-fd_mc_2023a_reco2} \
                   --requestid ritm1780305 --no_crc > ${OUTFILE}.root.json
 extractorExit=$?
 if [ $extractorExit -eq 0 ] ; then
@@ -102,7 +117,8 @@ fi
 
 ### Convert the metadata to metacat
 ##TODO -- make sure the RCDS behavior is correct
-python $INPUT_TAR_DIR_LOCAL/convert_metadata.py -i ${OUTFILE}.root.json
+python $INPUT_TAR_DIR_LOCAL/convert_metadata.py -i ${OUTFILE}.root.json \
+                                                -c ${RECOFCL}
 converterExit=$?
 if [ $converterExit -eq 0 ] ; then
   # Success !
@@ -124,6 +140,13 @@ if [ "${DETECTOR}" = "VD" ]; then
   sed ${OUTFILE}.root.json -e 's/full-reconstructed/pandora-info/' > ${OUTFILE}_Pandora_Events.pndr.json
   sed -i ${OUTFILE}_Pandora_Events.pndr.json -e 's/artroot/binary/' #> ${OUTFILE}_Pandora_Events.pndr.json
   sed -i ${OUTFILE}_Pandora_Events.pndr.json -e '/art.file_format/d'
+
+  #THISSIZE=$(echo `du ${OUTFILE}_Pandora_Events.pndr -b ` | cut -f1 -d' ')
+  #sed -i ${OUTFILE}_Pandora_Events.pndr.json -e "s/.*size.*/\"size\": ${THISSIZE}/"
+
+  #CHECKSUM=$(echo `xrdadler32 ${OUTFILE}_Pandora_Events.pndr` | cut -f1 -d' ')
+  #echo "checksum: ${CHECKSUM}"
+  #sed -i ${OUTFILE}_Pandora_Events.pndr.json -e "s/.*size.*/\"size\": ${THISSIZE}/"
   #sed -i ${OUTFILE}_Pandora_Events.pndr.json -e '/art.file_format/d'
   
   ##Copy over the metadata for validation.root 
@@ -131,6 +154,10 @@ if [ "${DETECTOR}" = "VD" ]; then
   sed ${OUTFILE}.root.json -e 's/full-reconstructed/pandora-info/' > ${OUTFILE}_Validation.root.json
   sed -i ${OUTFILE}_Validation.root.json -e 's/artroot/root/' #> ${OUTFILE}_Validation.root.json
   sed -i ${OUTFILE}_Validation.root.json -e '/art.file_format/d'
+  #THISSIZE=$(echo `du ${OUTFILE}_Validation.root -b ` | cut -f1 -d' ')
+  #sed -i ${OUTFILE}_Validation.root.json -e "s/.*size.*/\"size\": ${THISSIZE}/"
+  #CHECKSUM=$(echo `xrdadler32 ${OUTFILE}_Validation.root.json` | cut -f1 -d' ')
+  #echo "checksum: ${CHECKSUM}"
   #sed -i ${OUTFILE}_Validation.root.json -e '/art.file_format/d'
 fi
 
@@ -162,7 +189,11 @@ sed ${OUTFILE}.root.json -e 's/full-reconstructed/root-tuple-virtual/' > ${ANAOU
 sed -i ${ANAOUTFILE}.root.json -e 's/artroot/root/'
 sed -i ${ANAOUTFILE}.root.json -e '/art.file_format/d'
 sed -i ${ANAOUTFILE}.root.json -e '/art.process/d'
-#sed -i ${ANAOUTFILE}.root.json -e '/art.file_format/d'
+sed -i ${ANAOUTFILE}.root.json -e "s/${RECOFCL}/${ANAFCL}/"
+#THISSIZE=$(echo `du ${ANAOUTFILE}.root -b ` | cut -f1 -d' ')
+#sed -i ${ANAOUTFILE}.root.json -e "s/.*size.*/\"size\": ${THISSIZE}/"
+#CHECKSUM=$(echo `xrdadler32 ${ANAOUTFILE}.root` | cut -f1 -d' ')
+#echo "checksum: ${CHECKSUM}"
 
 ls
 exit $jobscriptExit
