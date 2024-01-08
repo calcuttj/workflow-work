@@ -1,6 +1,10 @@
 #!/bin/bash
 #
 source /cvmfs/dune.opensciencegrid.org/products/dune/setup_dune.sh
+setup metacat
+export METACAT_SERVER_URL=https://metacat.fnal.gov:9443/dune_meta_prod/app
+export METACAT_AUTH_SERVER_URL=https://metacat.fnal.gov:8143/auth/dune
+
 
 ##TODO -- write usage
 
@@ -12,6 +16,7 @@ HC="${HCPROD:-FHC}"
 ## Build up the fcls to use
 if [ "${DETECTOR}" = "HD" ]; then
   ANAFCL="standard_ana_dune10kt_1x2x6.fcl"
+  MDDETTYPE="fardet-hd"
 
   if [ "$HC" = "FHC" ]; then
     RECOFCL="standard_reco2_dune10kt_nu_1x2x6.fcl"
@@ -21,6 +26,7 @@ if [ "${DETECTOR}" = "HD" ]; then
 
 elif [ "${DETECTOR}" = "VD" ]; then
   ANAFCL="anatree_dunevd10kt_1x8x6_3view_30deg_geov3.fcl"
+  MDDETTYPE="fardet-vd"
 
   if [ "$HC" = "FHC" ]; then
     RECOFCL="reco2_dunevd10kt_nu_1x8x6_3view_30deg_geov3.fcl"
@@ -65,6 +71,17 @@ fi
 FILE=`echo ${DID_PFN_RSE} | cut -f2 -d' '`
 DID=`echo ${DID_PFN_RSE} | cut -f1 -d' '`
 echo "DID: ${DID}"
+
+metacat file show -mj ${DID} > old_md.json
+mcExit=$?
+if [ $mcExit -eq 0 ] ; then
+  echo "old metadata:"
+  cat old_md.json
+else
+  echo "Could not retrieve old metadata"
+  exit 1 
+fi
+
 #
 #
 now=$(date -u +"%Y%m%dT%H%M%SZ")
@@ -118,7 +135,10 @@ fi
 ### Convert the metadata to metacat
 ##TODO -- make sure the RCDS behavior is correct
 python $INPUT_TAR_DIR_LOCAL/convert_metadata.py -i ${OUTFILE}.root.json \
-                                                -c ${RECOFCL}
+                                                -c ${RECOFCL} -j old_md.json \
+                                                --app "art.reco2" \
+                                                --app_ver "${DUNE_VERSION:-v09_81_00d02}" \
+                                                --det "${MDDETTYPE}"
 converterExit=$?
 if [ $converterExit -eq 0 ] ; then
   # Success !
@@ -190,6 +210,7 @@ sed -i ${ANAOUTFILE}.root.json -e 's/artroot/root/'
 sed -i ${ANAOUTFILE}.root.json -e '/art.file_format/d'
 sed -i ${ANAOUTFILE}.root.json -e '/art.process/d'
 sed -i ${ANAOUTFILE}.root.json -e "s/${RECOFCL}/${ANAFCL}/"
+sed -i ${ANAOUTFILE}.root.json -e '/campaign/!s/reco2/anatree/'
 #THISSIZE=$(echo `du ${ANAOUTFILE}.root -b ` | cut -f1 -d' ')
 #sed -i ${ANAOUTFILE}.root.json -e "s/.*size.*/\"size\": ${THISSIZE}/"
 #CHECKSUM=$(echo `xrdadler32 ${ANAOUTFILE}.root` | cut -f1 -d' ')

@@ -4,18 +4,13 @@ import json
 #import root_metadata
 
 
-if __name__ == '__main__':
-  parser = ap()
-  parser.add_argument('-i', type=str)
-  parser.add_argument('-c', type=str, default=None)
-  parser.add_argument('--det', type=str, default=None)
-  parser.add_argument('--app_ver', type=str, default=None)
-  args = parser.parse_args()
+def del_fields(the_json):
+  to_del = ['file_name', 'parents', 'file_size']
+  for td in to_del: del the_json[td]
 
-  with open(args.i) as f:
-    imported_json = json.load(f)
+  return the_json
 
-  print(imported_json)
+def exchange_fields(the_json):
   fields = {
     'DUNE.campaign':'dune.campaign',
     'DUNE.requestid':'dune.requestid',
@@ -29,19 +24,39 @@ if __name__ == '__main__':
     'first_event':'core.first_event_number',
     'last_event':'core.last_event_number',
     'group':'core.group',
+    'art.run_type':'core.run_type',
   }
-
-  #to_move = [('file_size','size')]
-  to_move = []
-  to_del = ['file_name', 'parents', 'file_size']
-
   for f, newf in fields.items():
-    if f not in imported_json.keys(): continue
-    imported_json[newf] = imported_json[f]
-    del imported_json[f]
+    if f not in the_json.keys(): continue
+    the_json[newf] = the_json[f]
+    del the_json[f]
 
-  for td in to_del: del imported_json[td]
+  return the_json
 
+#def get_application(the_json)
+
+if __name__ == '__main__':
+  parser = ap()
+  parser.add_argument('-i', type=str)
+  parser.add_argument('-c', type=str, default=None)
+  parser.add_argument('-j', type=str, default=None)
+  parser.add_argument('--det', type=str, default=None)
+  parser.add_argument('--app_ver', type=str, default=None)
+  parser.add_argument('--app', type=str, default=None)
+  args = parser.parse_args()
+
+  with open(args.i) as f:
+    imported_json = json.load(f)
+
+  print(imported_json)
+
+  imported_json = exchange_fields(imported_json)
+
+  imported_json = del_fields(imported_json)
+  #to_del = ['file_name', 'parents', 'file_size']
+  #for td in to_del: del imported_json[td]
+
+  to_move = []
   over_meta = {
     tm[1]:imported_json[tm[0]] for tm in to_move
   }
@@ -63,6 +78,15 @@ if __name__ == '__main__':
 
   if args.app_ver is not None:
     imported_json['core.application.version'] = args.app_ver
+  if args.app is not None:
+    imported_json['core.application'] = args.app 
+    imported_json['core.application.family'] = args.app.split('.')[0]
+    imported_json['core.application.name'] = args.app.split('.')[1]
+
+  if args.j is not None:
+    with open(args.j, 'r') as old_json_file:
+      old_json = json.load(old_json_file)
+      imported_json['dune_mc.gen_fcl_filename'] = old_json['metadata']['dune_mc.gen_fcl_filename']
 
   print(imported_json)
   over_meta['metadata'] = imported_json
