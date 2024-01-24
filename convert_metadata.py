@@ -67,7 +67,7 @@ if __name__ == '__main__':
   runs_runs = [r[0] for r in runs]
   runs_subruns = [r[1] for r in runs]
   imported_json['core.runs'] = runs_runs
-  imported_json['core.runs_subruns'] = runs_subruns
+  imported_json['core.runs_subruns'] = [r*100000 + sr for r, sr in zip(runs_runs, runs_subruns)]
   del imported_json['runs']
 
   ##Check if various fields were reported. If so, add to metadata
