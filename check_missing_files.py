@@ -12,17 +12,13 @@ if __name__ == '__main__':
 
   mc = MetaCatClient()
   mc_files = [f['name'] for f in mc.query(args.q)]
-  #print(mc_files)
 
   print(mc_files[0])
-  #stripped_mc_files = ['_'.join(f.split('_')[n1:n1+2]) for f in mc_files]
 
   rc = RucioClient()
   rucio_files = ['_'.join(f['name'].split('_')[:-3]) + '.root' for f in rc.list_files(*(args.d.split(':')))]
 
   print(rucio_files[0])
-  #print('_'.join(rucio_files[0].split('_')[:-3]) + '.root')
-  #print(rucio_files)
 
   bad_files = [i + '\n' for i in mc_files if i not in rucio_files]
   print(bad_files)
