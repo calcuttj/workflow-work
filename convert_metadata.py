@@ -43,6 +43,7 @@ if __name__ == '__main__':
   parser.add_argument('--det', type=str, default=None)
   parser.add_argument('--app_ver', type=str, default=None)
   parser.add_argument('--app', type=str, default=None)
+  parser.add_argument('--parent', type=str, default=None)
   args = parser.parse_args()
 
   with open(args.i) as f:
@@ -83,10 +84,17 @@ if __name__ == '__main__':
     imported_json['core.application.family'] = args.app.split('.')[0]
     imported_json['core.application.name'] = args.app.split('.')[1]
 
+  if args.parent is not None:
+    imported_json['parents'] = [{
+      'file_name':args.parent,
+    }]
+
+
   if args.j is not None:
     with open(args.j, 'r') as old_json_file:
       old_json = json.load(old_json_file)
       imported_json['dune_mc.gen_fcl_filename'] = old_json['metadata']['dune_mc.gen_fcl_filename']
+      imported_json['core.run_type'] = old_json['metadata']['core.run_type']
 
   print(imported_json)
   over_meta['metadata'] = imported_json

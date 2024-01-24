@@ -34,6 +34,12 @@ elif [ "${DETECTOR}" = "VD" ]; then
     RECOFCL="reco2_dunevd10kt_anu_1x8x6_3view_30deg_geov3.fcl"
   fi
 
+elif [ "${DETECTOR}" = "TEST" ]; then
+  RECOFCL="${INPUT_TAR_DIR_LOCAL}/test.fcl"
+
+elif [ "${DETECTOR}" = "TEST2" ]; then
+  RECOFCL="${INPUT_TAR_DIR_LOCAL}/test2.fcl"
+
 else
   echo "NEED TO REQUEST EITHER HD OR VD. USER REQUESTED ${DETECTOR}"
   exit 1
@@ -47,6 +53,17 @@ echo "and Ana fcl: ${ANAFCL}"
 setup dunesw \
    "${DUNE_VERSION:-v09_81_00d02}" \
    -q "${DUNE_QUALIFIER:-e26:prof}"
+echo "printing env"
+env
+
+
+##Force certain env vars to force good behavior
+export TF_NUM_THREADS=1   
+export OPENBLAS_NUM_THREADS=1 
+export JULIA_NUM_THREADS=1 
+export MKL_NUM_THREADS=1 
+export NUMEXPR_NUM_THREADS=1 
+export OMP_NUM_THREADS=1  
 
 #
 echo "Will use justin-get-file"
@@ -63,7 +80,7 @@ DID_PFN_RSE=`$JUSTIN_PATH/justin-get-file`
 #fi
 
 ##Check that any file was returned
-if [ "$did_pfn_rse" != "" ] ; then
+if [ "${DID_PFN_RSE}" == "" ] ; then
   echo "Could not get file"
   exit 0
 fi
@@ -112,6 +129,10 @@ else
   exit $jobscriptExit
 fi
 
+if [ "${DETECTOR}" = "TEST" ] || [ "${DETECTOR}" = "TEST2" ]; then
+  echo "Done testing. Exiting"
+  exit 0
+fi
 ORIG_OUTFILE=`ls *reco2.root`
 OUTFILE=`echo "${ORIG_OUTFILE}_${now}_reco2" | sed -e 's/reco2.root//'`
 
@@ -138,7 +159,8 @@ python $INPUT_TAR_DIR_LOCAL/convert_metadata.py -i ${OUTFILE}.root.json \
                                                 -c ${RECOFCL} -j old_md.json \
                                                 --app "art.reco2" \
                                                 --app_ver "${DUNE_VERSION:-v09_81_00d02}" \
-                                                --det "${MDDETTYPE}"
+                                                --det "${MDDETTYPE}" \
+                                                --parent ${DID}
 converterExit=$?
 if [ $converterExit -eq 0 ] ; then
   # Success !
@@ -152,33 +174,28 @@ fi
 
 ##If running VD, there will also be pandora files. Rename these
 if [ "${DETECTOR}" = "VD" ]; then
-  mv Validation.root "${OUTFILE}_Validation.root"
-  mv Pandora_Events.pndr "${OUTFILE}_Pandora_Events.pndr"
+  all_good=true
+  mv Validation.root "${OUTFILE}_Validation.root" || all_good=false
+  mv Pandora_Events.pndr "${OUTFILE}_Pandora_Events.pndr" || all_good=false
 
   ##Copy over the metadata for pndr
   ##Edit the fields corresepondingly
-  sed ${OUTFILE}.root.json -e 's/full-reconstructed/pandora-info/' > ${OUTFILE}_Pandora_Events.pndr.json
-  sed -i ${OUTFILE}_Pandora_Events.pndr.json -e 's/artroot/binary/' #> ${OUTFILE}_Pandora_Events.pndr.json
-  sed -i ${OUTFILE}_Pandora_Events.pndr.json -e '/art.file_format/d'
-
-  #THISSIZE=$(echo `du ${OUTFILE}_Pandora_Events.pndr -b ` | cut -f1 -d' ')
-  #sed -i ${OUTFILE}_Pandora_Events.pndr.json -e "s/.*size.*/\"size\": ${THISSIZE}/"
-
-  #CHECKSUM=$(echo `xrdadler32 ${OUTFILE}_Pandora_Events.pndr` | cut -f1 -d' ')
-  #echo "checksum: ${CHECKSUM}"
-  #sed -i ${OUTFILE}_Pandora_Events.pndr.json -e "s/.*size.*/\"size\": ${THISSIZE}/"
-  #sed -i ${OUTFILE}_Pandora_Events.pndr.json -e '/art.file_format/d'
+  sed ${OUTFILE}.root.json -e 's/full-reconstructed/pandora-info/' > ${OUTFILE}_Pandora_Events.pndr.json || all_good=false
+  sed -i ${OUTFILE}_Pandora_Events.pndr.json -e 's/artroot/binary/' || all_good=false
+  sed -i ${OUTFILE}_Pandora_Events.pndr.json -e '/art.file_format/d' || all_good=false
   
   ##Copy over the metadata for validation.root 
   ##Edit the fields corresepondingly
-  sed ${OUTFILE}.root.json -e 's/full-reconstructed/pandora-info/' > ${OUTFILE}_Validation.root.json
-  sed -i ${OUTFILE}_Validation.root.json -e 's/artroot/root/' #> ${OUTFILE}_Validation.root.json
-  sed -i ${OUTFILE}_Validation.root.json -e '/art.file_format/d'
-  #THISSIZE=$(echo `du ${OUTFILE}_Validation.root -b ` | cut -f1 -d' ')
-  #sed -i ${OUTFILE}_Validation.root.json -e "s/.*size.*/\"size\": ${THISSIZE}/"
-  #CHECKSUM=$(echo `xrdadler32 ${OUTFILE}_Validation.root.json` | cut -f1 -d' ')
-  #echo "checksum: ${CHECKSUM}"
-  #sed -i ${OUTFILE}_Validation.root.json -e '/art.file_format/d'
+  sed ${OUTFILE}.root.json -e 's/full-reconstructed/pandora-info/' > ${OUTFILE}_Validation.root.json || all_good=false
+  sed -i ${OUTFILE}_Validation.root.json -e 's/artroot/root/' || all_good=false
+  sed -i ${OUTFILE}_Validation.root.json -e '/art.file_format/d' || all_good=false
+
+  if [ $all_good = false ]; then
+    echo "Something failed when editing pandora metadata"
+    jobscriptExit=1
+    exit $jobscriptExit
+  fi
+
 fi
 
 ANAOUTFILE="${OUTFILE}_ana"
@@ -194,6 +211,7 @@ lar -c "${ANAFCL}" \
 larExit=$?
 echo "Ana step lar exit code $larExit"
 
+### TODO: Handle this correctly
 if [ $larExit -eq 0 ] ; then
   # Success !
   # Log the file for justin and move on to the next step
@@ -205,16 +223,20 @@ else
   exit $jobscriptExit
 fi
 
-sed ${OUTFILE}.root.json -e 's/full-reconstructed/root-tuple-virtual/' > ${ANAOUTFILE}.root.json
-sed -i ${ANAOUTFILE}.root.json -e 's/artroot/root/'
-sed -i ${ANAOUTFILE}.root.json -e '/art.file_format/d'
-sed -i ${ANAOUTFILE}.root.json -e '/art.process/d'
-sed -i ${ANAOUTFILE}.root.json -e "s/${RECOFCL}/${ANAFCL}/"
-sed -i ${ANAOUTFILE}.root.json -e '/campaign/!s/reco2/anatree/'
-#THISSIZE=$(echo `du ${ANAOUTFILE}.root -b ` | cut -f1 -d' ')
-#sed -i ${ANAOUTFILE}.root.json -e "s/.*size.*/\"size\": ${THISSIZE}/"
-#CHECKSUM=$(echo `xrdadler32 ${ANAOUTFILE}.root` | cut -f1 -d' ')
-#echo "checksum: ${CHECKSUM}"
+sed_good=true
+sed ${OUTFILE}.root.json -e 's/full-reconstructed/root-tuple-virtual/' > ${ANAOUTFILE}.root.json || sed_good=false
+sed -i ${ANAOUTFILE}.root.json -e 's/artroot/root/' || sed_good=false
+sed -i ${ANAOUTFILE}.root.json -e '/art.file_format/d' || sed_good=false
+sed -i ${ANAOUTFILE}.root.json -e '/art.process/d' || sed_good=false
+sed -i ${ANAOUTFILE}.root.json -e "s/${RECOFCL}/${ANAFCL}/" || sed_good=false
+sed -i ${ANAOUTFILE}.root.json -e '/campaign/!s/reco2/anatree/' || sed_good=false
+sed -i ${ANAOUTFILE}.root.json -e "s/${DID}/${OUTFILE}.root/" || sed_good=false
+
+if [ $sed_good = false ]; then
+  echo "Something failed when editing ana metadata"
+  jobscriptExit=1
+  exit $jobscriptExit
+fi
 
 ls
 exit $jobscriptExit
