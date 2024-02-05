@@ -85,7 +85,7 @@ if __name__ == '__main__':
     imported_json['core.application.name'] = args.app.split('.')[1]
 
   if args.parent is not None:
-    imported_json['parents'] = [{
+    imported_json['core.parents'] = [{
       'file_name':args.parent,
     }]
 
