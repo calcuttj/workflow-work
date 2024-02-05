@@ -3,6 +3,7 @@
 setup metacat
 setup justin
 setup rucio
+setup dunesw v09_81_00d02 -q e26:prof
 
 export METACAT_SERVER_URL=https://metacat.fnal.gov:9443/dune_meta_prod/app
 export METACAT_AUTH_SERVER_URL=https://metacat.fnal.gov:8143/auth/dune
