@@ -7,6 +7,7 @@ if __name__ == '__main__':
   parser.add_argument('--tiers', type=str, nargs='+',
                       help='Rucio dataset used as outputs of request')
   parser.add_argument('--type', type=str, default='hd')
+  parser.add_argument('--postfix', type=str, default='')
   args = parser.parse_args()
 
 
@@ -14,7 +15,7 @@ if __name__ == '__main__':
   rc = RucioClient()
   files = dict()
   for tier in args.tiers:
-    dataset = f'fardet-{args.type}:fardet-{args.type}-{tier}_ritm1780305'
+    dataset = f'fardet-{args.type}:fardet-{args.type}-{tier}_ritm1780305_{args.postfix}'
     print(dataset)
 
     files[tier] = {
