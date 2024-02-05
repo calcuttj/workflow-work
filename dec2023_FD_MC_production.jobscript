@@ -58,12 +58,25 @@ env
 
 
 ##Force certain env vars to force good behavior
-export TF_NUM_THREADS=1   
-export OPENBLAS_NUM_THREADS=1 
-export JULIA_NUM_THREADS=1 
-export MKL_NUM_THREADS=1 
-export NUMEXPR_NUM_THREADS=1 
-export OMP_NUM_THREADS=1  
+#export TF_NUM_THREADS=$JUSTIN_PROCESSORS    
+#export OPENBLAS_NUM_THREADS=$JUSTIN_PROCESSORS  
+#export JULIA_NUM_THREADS=$JUSTIN_PROCESSORS  
+#export MKL_NUM_THREADS=$JUSTIN_PROCESSORS  
+#export NUMEXPR_NUM_THREADS=$JUSTIN_PROCESSORS  
+#export OMP_NUM_THREADS=$JUSTIN_PROCESSORS   
+
+if [ -z ${JUSTIN_PROCESSORS} ]; then
+  JUSTIN_PROCESSORS=1
+fi
+
+echo "Justin processors: ${JUSTIN_PROCESSORS}"
+
+export TF_NUM_THREADS=${JUSTIN_PROCESSORS}   
+export OPENBLAS_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export JULIA_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export MKL_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export NUMEXPR_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export OMP_NUM_THREADS=${JUSTIN_PROCESSORS}  
 
 #
 echo "Will use justin-get-file"
@@ -155,7 +168,7 @@ fi
 
 ### Convert the metadata to metacat
 ##TODO -- make sure the RCDS behavior is correct
-python $INPUT_TAR_DIR_LOCAL/convert_metadata.py -i ${OUTFILE}.root.json \
+python $CONVERT_DIR/convert_metadata.py -i ${OUTFILE}.root.json \
                                                 -c ${RECOFCL} -j old_md.json \
                                                 --app "art.reco2" \
                                                 --app_ver "${DUNE_VERSION:-v09_81_00d02}" \
