@@ -137,9 +137,9 @@ if [ $larExit -eq 0 ] ; then
   echo "Moving on to analysis "
 else
   # Error -- exit immediately 
-  jobscriptExit=1
+  #jobscriptExit=1
   tail -100 reco2.log
-  exit $jobscriptExit
+  exit $larExit 
 fi
 
 if [ "${DETECTOR}" = "TEST" ] || [ "${DETECTOR}" = "TEST2" ]; then
@@ -163,7 +163,7 @@ else
   # Error -- exit immediately 
   jobscriptExit=1
   echo "Failed to extract md"
-  exit $jobscriptExit
+  exit $extractorExit
 fi
 
 ### Convert the metadata to metacat
@@ -182,7 +182,7 @@ else
   # Error -- exit immediately 
   jobscriptExit=1
   echo "Failed to convert md"
-  exit $jobscriptExit
+  exit $converterExit
 fi
 
 ##If running VD, there will also be pandora files. Rename these
@@ -233,7 +233,7 @@ else
   # Error -- exit immediately 
   jobscriptExit=1
   tail -100 ana.log
-  exit $jobscriptExit
+  exit $larExit
 fi
 
 sed_good=true
@@ -252,4 +252,4 @@ if [ $sed_good = false ]; then
 fi
 
 ls
-exit $jobscriptExit
+exit 0

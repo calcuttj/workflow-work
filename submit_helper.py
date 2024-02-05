@@ -50,7 +50,8 @@ def build_output(args):
     (f'{t[0]}:fardet-{args.det.lower()}-{t[1]}_ritm1780305_{args.flavor}_'
      f'{args.hc.lower()}_skip{args.skip}' +
      (f'_limit{args.limit}' if args.limit is not None else '_end') +
-     ('_test' if args.test else '')
+     ('_test' if args.test else '') +
+     ('_$JUSTIN_WORKFLOW_ID' if args.wid_out else '')
     )
     for t in types
   ]
@@ -90,6 +91,7 @@ if __name__ == '__main__':
                               ],
                       default='nu')
   parser.add_argument('--test', action='store_true', help='Switch the scope to "usertests"')
+  parser.add_argument('--wid_out', action='store_true', help='Add justin workflow id to end of output datasets')
   parser.add_argument('--no_out', action='store_true', help='Prevent output from being saved')
   parser.add_argument('--dset_postfix', type=str, default='', help='Postfix to give to the output pattern')
   parser.add_argument('--dry_run', action='store_true')
@@ -98,6 +100,8 @@ if __name__ == '__main__':
   parser.add_argument('--skip', type=int, default=0)
   parser.add_argument('--limit', type=int, default=None)
   parser.add_argument('--lifetime', default=None, type=int, help='Requested lifetime in seconds')
+  parser.add_argument('--distance', default=30, type=str, help='Max site--rse distance')
+  parser.add_argument('--memory', default=2000, type=str, help='Requested memory')
   parser.add_argument('--nevents', type=int, default=None)
   args = parser.parse_args()
 
@@ -114,6 +118,8 @@ if __name__ == '__main__':
     '--env', f'DETPROD={args.det.upper()}',
     '--env', f'HCPROD={args.hc.upper()}',
     '--scope', scope,
+    '--max-distance', str(args.distance),
+    '--rss-mb', str(args.memory),
   ]
 
   ##Build up list of tars to upload and provide to job
