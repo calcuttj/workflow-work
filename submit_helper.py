@@ -48,7 +48,7 @@ def build_output(args):
 
   outputs = [
     (f'{t[0]}:fardet-{args.det.lower()}-{t[1]}_ritm1780305_{args.flavor}_'
-     f'{args.hc.lower()}_skip{args.skip}' +
+     f'{get_horn_current(args).lower()}_skip{args.skip}' +
      (f'_limit{args.limit}' if args.limit is not None else '_end') +
      ('_test' if args.test else '') +
      ('_$JUSTIN_WORKFLOW_ID' if args.wid_out else '')
@@ -67,6 +67,9 @@ def is_hd(args):
 def is_vd(args):
   return args.det.upper() == 'VD'
 
+def get_horn_current(args):
+  return ('RHC' if 'anu' in args.flavor else 'FHC')
+
 def check_flavor(args):
   hd_flavors = ['nu', 'anu', 'nue', 'anue', 'nutau', 'anutau']
   vd_flavors = [
@@ -79,11 +82,11 @@ def check_flavor(args):
   elif (is_vd(args) and args.flavor not in vd_flavors):
     raise ValueError(f'Must choose flavor in {vd_flavors} when running VD')
 
+
 if __name__ == '__main__':
   parser = ap()
   parser.add_argument('--script', type=str, default='dec2023_FD_MC_production.jobscript')
   parser.add_argument('--det', type=str, choices=['HD', 'VD', 'hd', 'vd'], default='HD')
-  parser.add_argument('--hc', type=str, choices=['FHC', 'fhc', 'RHC', 'rhc'], default='FHC')
   parser.add_argument('--flavor', type=str,
                       choices=['nu', 'anu', 'nue', 'anue', 'nutau', 'anutau',
                                'nu_numu2nue_nue2nutau', 'anu_numu2nue_nue2nutau',
@@ -116,7 +119,7 @@ if __name__ == '__main__':
     'justin', 'simple-workflow',
     '--jobscript', args.script,
     '--env', f'DETPROD={args.det.upper()}',
-    '--env', f'HCPROD={args.hc.upper()}',
+    '--env', f'HCPROD={get_horn_current(args)}',
     '--scope', scope,
     '--max-distance', str(args.distance),
     '--rss-mb', str(args.memory),
