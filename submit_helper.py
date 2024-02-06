@@ -2,6 +2,8 @@ from argparse import ArgumentParser as ap
 import subprocess
 
 def check_tar_str(args):
+  if args.simpletar: return
+
   if args.tars is None and not args.notars:
     raise RuntimeError('Must explicitly acknowledge that you do not want to provide a tar file to the job')
 
@@ -28,8 +30,11 @@ def upload_tar(tar):
 
 def build_tar_dict(args):
 
-  tars = [i.split(':') for i in args.tars]
-  return {tarstr[0]:(tarstr[1], upload_tar(tarstr[0])) for tarstr in tars}
+  if not args.simpletar:
+    tars = [i.split(':') for i in args.tars]
+    return {tarstr[0]:(tarstr[1], upload_tar(tarstr[0])) for tarstr in tars}
+  else:
+    return {tarstr:(f'{tarstr.replace(".tar", "_DIR").upper()}', upload_tar(tarstr)) for tarstr in args.tars}
 
 def build_input(args):
   if is_hd(args):
@@ -99,6 +104,7 @@ if __name__ == '__main__':
   parser.add_argument('--dset_postfix', type=str, default='', help='Postfix to give to the output pattern')
   parser.add_argument('--dry_run', action='store_true')
   parser.add_argument('--tars', nargs='+', type=str)
+  parser.add_argument('--simpletar', action='store_true')
   parser.add_argument('--notars', action='store_true', help='Must explicitly say there are no tars to be provided')
   parser.add_argument('--skip', type=int, default=0)
   parser.add_argument('--limit', type=int, default=None)
