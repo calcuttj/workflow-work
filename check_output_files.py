@@ -15,7 +15,7 @@ if __name__ == '__main__':
   rc = RucioClient()
   files = dict()
   for tier in args.tiers:
-    dataset = f'fardet-{args.type}:fardet-{args.type}-{tier}_ritm1780305_{args.postfix}'
+    dataset = f'fardet-{args.type}:fardet-{args.type}-{tier}_ritm1780305{args.postfix}'
     print(dataset)
 
     files[tier] = {
@@ -24,7 +24,7 @@ if __name__ == '__main__':
       ):f['name']
       for f in rc.list_files(*(dataset.split(':')))
     }
-    print(len(files[tier]))
+    print('Files:', len(files[tier]))
     #print(files[tier].values()[0])
 
     print()
