@@ -5,7 +5,7 @@ import json
 
 
 def del_fields(the_json):
-  to_del = ['file_name', 'parents', 'file_size']
+  to_del = ['file_name', 'file_size']
   for td in to_del: del the_json[td]
 
   return the_json
@@ -33,6 +33,16 @@ def exchange_fields(the_json):
 
   return the_json
 
+def convert_time(time_str):
+  from datetime import datetime, timezone
+  dt = datetime.strptime(time_str, '%Y-%m-%dT%H:%M:%S')
+  timestamp = dt.replace(tzinfo=timezone.utc).timestamp()
+  return timestamp
+
+def fix_times(imported_json):
+  for time in ('core.start_time', 'core.end_time'):
+    imported_json[time] = convert_time(imported_json[time])
+
 #def get_application(the_json)
 
 if __name__ == '__main__':
@@ -43,7 +53,7 @@ if __name__ == '__main__':
   parser.add_argument('--det', type=str, default=None)
   parser.add_argument('--app_ver', type=str, default=None)
   parser.add_argument('--app', type=str, default=None)
-  parser.add_argument('--parent', type=str, default=None)
+  parser.add_argument('--parent', type=str, required=True)
   args = parser.parse_args()
 
   with open(args.i) as f:
@@ -52,14 +62,18 @@ if __name__ == '__main__':
   print(imported_json)
 
   imported_json = exchange_fields(imported_json)
+  fix_times(imported_json)
 
   imported_json = del_fields(imported_json)
   #to_del = ['file_name', 'parents', 'file_size']
   #for td in to_del: del imported_json[td]
 
-  to_move = []
+  #Fix parents
+  new_parent_dict = {'did':args.parent}
+  to_move = [['parents', 'parents']]
   over_meta = {
-    tm[1]:imported_json[tm[0]] for tm in to_move
+    #tm[1]:imported_json[tm[0]] for tm in to_move
+    'parents':[new_parent_dict]
   }
   for tm in to_move: del imported_json[tm[0]]
 
@@ -84,10 +98,10 @@ if __name__ == '__main__':
     imported_json['core.application.family'] = args.app.split('.')[0]
     imported_json['core.application.name'] = args.app.split('.')[1]
 
-  if args.parent is not None:
-    imported_json['core.parents'] = [{
-      'file_name':args.parent,
-    }]
+  #if args.parent is not None:
+  #  over_meta['parents'] = [{
+  #    'file_name':args.parent,
+  #  }]
 
 
   if args.j is not None:

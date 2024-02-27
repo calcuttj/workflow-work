@@ -215,6 +215,7 @@ ANAOUTFILE="${OUTFILE}_ana"
 echo "Will output ana to $ANAOUTFILE"
 
 ###Run ana 
+anastart=`date +"%s"`.0
 lar -c "${ANAFCL}" \
     -n "${NEVENTS:--1}" \
     -T "$ANAOUTFILE.root" \
@@ -223,6 +224,8 @@ lar -c "${ANAFCL}" \
 
 larExit=$?
 echo "Ana step lar exit code $larExit"
+anaend=`date +"%s"`.0
+echo "ANA start and end ${anastart} ${anaend}"
 
 ### TODO: Handle this correctly
 if [ $larExit -eq 0 ] ; then
@@ -243,7 +246,9 @@ sed -i ${ANAOUTFILE}.root.json -e '/art.file_format/d' || sed_good=false
 sed -i ${ANAOUTFILE}.root.json -e '/art.process/d' || sed_good=false
 sed -i ${ANAOUTFILE}.root.json -e "s/${RECOFCL}/${ANAFCL}/" || sed_good=false
 sed -i ${ANAOUTFILE}.root.json -e '/campaign/!s/reco2/anatree/' || sed_good=false
-sed -i ${ANAOUTFILE}.root.json -e "s/${DID}/${OUTFILE}.root/" || sed_good=false
+sed -i ${ANAOUTFILE}.root.json -e "s/${DID}/${JUSTIN_SCOPE}:${OUTFILE}.root/" || sed_good=false
+sed -i ${ANAOUTFILE}.root.json -e "/core.start_time/c\\\"core.start_time\": ${anastart},"
+sed -i ${ANAOUTFILE}.root.json -e "/core.end_time/c\\\"core.end_time\": ${anaend},"
 
 if [ $sed_good = false ]; then
   echo "Something failed when editing ana metadata"

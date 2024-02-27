@@ -108,7 +108,10 @@ if __name__ == '__main__':
   parser.add_argument('--notars', action='store_true', help='Must explicitly say there are no tars to be provided')
   parser.add_argument('--skip', type=int, default=0)
   parser.add_argument('--limit', type=int, default=None)
-  parser.add_argument('--lifetime', default=None, type=int, help='Requested lifetime in seconds')
+  parser.add_argument('--job-lifetime', default=None, type=int, help='Requested job lifetime in seconds')
+  parser.add_argument('--out-lifetime', default=None, type=int,
+                      help='Lifetime to give to output datasets -- '
+                           'applicable only if a new dataset is being created')
   parser.add_argument('--distance', default=30, type=str, help='Max site--rse distance')
   parser.add_argument('--memory', default=2000, type=str, help='Requested memory')
   parser.add_argument('--nevents', type=int, default=None)
@@ -140,11 +143,13 @@ if __name__ == '__main__':
   cmd += ['--mql', f'"files from {build_input(args)}"']
   cmd += build_output(args)
 
-  if args.lifetime is not None:
-    cmd += ['--wall-seconds', str(args.lifetime)]
+  if args.job_lifetime is not None:
+    cmd += ['--wall-seconds', str(args.job_lifetime)]
   if args.nevents is not None:
     cmd += ['--env', f'NEVENTS={args.nevents}']
 
+  if args.out_lifetime is not None:
+    cmd += ['--lifetime-days', str(args.out_lifetime)]
 
   print('Running')
   print(cmd[0], cmd[1])
