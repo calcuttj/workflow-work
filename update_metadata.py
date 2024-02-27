@@ -2,10 +2,10 @@ from metacat.webapi import MetaCatClient
 from argparse import ArgumentParser as ap
 import multiprocessing as mp
 
-def process_loop(mc, mc_files):
+def process_loop(args, mc, mc_files, iproc):
   nfiles = len(mc_files)
   for imcf, (f,md) in enumerate(mc_files):
-    print(f'{imcf}/{nfiles} Editing file', f)
+    #print(f'{imcf}/{nfiles} Editing file', f)
 
     new_metadata = dict()
 
@@ -14,9 +14,16 @@ def process_loop(mc, mc_files):
     #print(f, md['core.runs'], subrun)
     factor = 100000
     #print((subrun < run*factor))
+    any_bad = False
     if (subrun < run*factor):
+      any_bad = True
       new_subrun = subrun + run*factor
+      print(iproc, f, 'subrun bad')
       new_metadata['core.runs_subruns'] = [new_subrun]
+
+    if 'core.parents' not in md.keys():
+      print(iproc, f, 'no parents')
+      any_bad = True
 
     if md['core.application.name'] == 'anatree':
       parent = f.replace('_ana', '')
@@ -29,7 +36,9 @@ def process_loop(mc, mc_files):
     #for k,v in new_metadata.items():
     #  print(k,v)
 
-    mc.update_file(f, metadata=new_metadata)
+    if not args.check:
+      mc.update_file(f, metadata=new_metadata)
+      print('Updated')
 
 if __name__ == '__main__':
   parser = ap()
@@ -45,7 +54,7 @@ if __name__ == '__main__':
   nfiles = int(len(mc_files)/args.procs)
   print(nfiles)
   split_files = [mc_files[i*nfiles:(i+1)*nfiles] for i in range(args.procs)]
-  procs = [mp.Process(target=process_loop, args=(mc, split_files[i], )) for i in range(args.procs)]
+  procs = [mp.Process(target=process_loop, args=(args, mc, split_files[i], i)) for i in range(args.procs)]
   for p in procs: 
     p.start()
   for p in procs:
