@@ -63,7 +63,7 @@ def build_output(args):
   results = []
   for o in outputs:
     results.append('--output-pattern')
-    results.append(o)
+    results.append(f"'{o}'")
   return results 
 
 def is_hd(args):
