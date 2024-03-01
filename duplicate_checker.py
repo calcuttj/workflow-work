@@ -1,7 +1,6 @@
 from metacat.webapi import MetaCatClient
 from argparse import ArgumentParser as ap
 
-
 def get_files_and_dupes(query):
   files = [i for i in mc_client.query(query)]
 
@@ -26,6 +25,8 @@ if __name__ == '__main__':
   parser.add_argument('--list', action='store_true')
   parser.add_argument('--save', type=str, default=None)
   args = parser.parse_args()
+
+
   mc_client = MetaCatClient()
 
   base_query = ("files where dune.workflow['workflow_id'] in "
