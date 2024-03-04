@@ -1,0 +1,3 @@
+#include "prod_beam_cosmics_1GeV_protodunehd.fcl"
+physics.producers.generator.FileName: "/pnfs/dune/persistent/dunepro/beam_data/simulation/G4beamlineVersion3.06/v34b_1GeV_G4beamlineVersion3.06/H4_v34b_1GeV_-27.7_10M_1.root"
+physics.producers.generator.StartEvent: 0

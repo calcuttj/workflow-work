@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "core.run_type": "protodune-hd",
+    "dune.campaign": "pdhd_mc_2024a",
+    "core.data_tier": "g4-stage1",
+    "core.application.version": "v09_83_01d00",
+    "dune.config_file": "standard_g4_protodunehd_stage1.fcl",
+    "dune_mc.gen_fcl_filename": "prod_beam_cosmics_1GeV_protodunehd.fcl",
+    "core.data_stream": "out1",
+    "dune.requestid": "ritm1997595",
+    "core.file_type": "mc",
+    "dune_mc.detector_type": "protodune-hd",
+    "core.file_format": "artroot",
+    "dune_mc.with_cosmics": 1
+  }
+}
