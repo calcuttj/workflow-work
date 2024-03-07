@@ -1,7 +1,7 @@
 {
   "metadata": {
     "core.group": "dune",
-    "core.run_type": "protodune-hd",
+    "core.run_type": "hd-protodune",
     "dune.campaign": "pdhd_mc_2024a",
     "core.data_tier": "g4",
     "core.application.version": "v09_83_01d00",
@@ -13,7 +13,7 @@
     "core.data_stream": "out1",
     "dune.requestid": "ritm1997595",
     "core.file_type": "mc",
-    "dune_mc.detector_type": "protodune-hd",
+    "dune_mc.detector_type": "hd-protodune",
     "core.file_format": "artroot",
     "dune_mc.with_cosmics": 1,
     "dune_mc.generators": "beam_cosmics",
