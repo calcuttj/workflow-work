@@ -1,16 +1,19 @@
 #!/bin/bash
 #
 source /cvmfs/dune.opensciencegrid.org/products/dune/setup_dune.sh
-setup metacat
-export METACAT_SERVER_URL=https://metacat.fnal.gov:9443/dune_meta_prod/app
-export METACAT_AUTH_SERVER_URL=https://metacat.fnal.gov:8143/auth/dune
 
 #Setup recent lar software suite
+DUNE_VERSION=${DUNE_VERSION:-v09_85_00d00}
 setup dunesw \
-   "${DUNE_VERSION:-v09_83_01d00}" \
+   "${DUNE_VERSION}" \
    -q "${DUNE_QUALIFIER:-e26:prof}"
-echo "printing env"
 
+if [ $? -ne 0 ]; then
+  echo "Failed to setup dunesw $DUNE_VERSION $DUNE_QUALIFIER"
+fi
+
+echo "DUNESW loc:"
+ups active | grep dunesw
 
 if [ -z ${JUSTIN_PROCESSORS} ]; then
   JUSTIN_PROCESSORS=1
@@ -25,6 +28,7 @@ export MKL_NUM_THREADS=${JUSTIN_PROCESSORS}
 export NUMEXPR_NUM_THREADS=${JUSTIN_PROCESSORS} 
 export OMP_NUM_THREADS=${JUSTIN_PROCESSORS}  
 
+echo "printing env"
 env
 
 echo "Will use justin-get-file"
@@ -39,72 +43,230 @@ if [ -z ${LINENUMBER} ] ; then
   LINENUMBER=$pfn
 fi
 
+STARTLINE=${STARTLINE:-0}
+echo "Adding ${STARTLINE} to linenumber ${LINENUMBER}"
+LINENUMBER=$[ LINENUMBER + STARTLINE ]
+echo $LINENUMBER
+
 # Get the file number and iteration within the file that we want to use
-line=`sed -n "${LINENUMBER}p" ${INPUT_DIR}/all_h4_prod_nums.txt`
+get_nums=true
+line=`sed -n "${LINENUMBER}p" ${INPUT_DIR}/all_h4_prod_nums.txt` || get_nums=false
 echo "using ${LINENUMBER} from input file"
 echo ${line}
 split=($line)
-iter=${split[1]}
-filenum=${split[0]}
+iter=${split[1]} || get_nums=false
+filenum=${split[0]} || get_nums=false
+nevents=${split[2]} || get_nums=false
+eventnum=$[ iter * 10 ] || get_nums=false
+if [ $get_nums = false ]; then
+  echo "Failed to get numbers from input file"
+  exit 1
+fi
 echo "File: ${filenum}"
 echo "Iter: ${iter}"
 
-sed ${INPUT_DIR}/pdhd_prod.fcl -e "s/_1.root/_${filenum}.root/" > prod.fcl
-sed -i prod.fcl -e "s/StartEvent: 0/StartEvent: ${iter}/"
+sed ${INPUT_DIR}/pdhd_prod.fcl \
+  -e "s/_1.root/_${filenum}.root/" \
+  -e "s/StartEvent: 0/StartEvent: ${iter}/" \
+  -e "s/firstRun:    1/firstRun:    ${filenum}/" \
+  -e "s/firstEvent:  1/firstEvent:    ${eventnum}/" > prod.fcl
+
+if [ $? -ne 0 ]; then
+  echo "Could not edit pdhd_prod.fcl numbers"
+  exit 1
+fi
+
+nevents=${NEVENTS:-$nevents} #Set from env override or from above
+echo "nevents: $nevents"
 
 # Run Generator
+echo "Running prod"
 now=$(date -u +"%Y%m%dT%H%M%SZ")
 prodname="prod_beam_p1GeV_cosmics_protodunehd_${now}"
 lar -c prod.fcl \
     -o ${prodname}.root \
-    -n ${NEVENTS:-1}
+    -n ${nevents} >prod.log 2>&1
+prodExit=$?
+if [ $prodExit -ne 0 ]; then
+  echo "Error in prod"
+  tail -100 prod.log
+  exit 
+fi
 
-
-
-# Make metadata
-overrides="dune_mc.h4_input_file=H4_v34b_1GeV_-27.7_10M_${filenum}.root"
-overrides="${overrides} dune_mc.h4_input_iteration=${iter}"
-python ${INPUT_DIR}/pdhd_meta_writer.py \
-       --json ${INPUT_DIR}/pdhd_base_meta.json \
-       --overrides ${overrides} \
-       -o ${prodname}.root.json
 
 # Stage 1 G4
+echo "Running g4stage1"
 g4stage1_name="${prodname}_g4_stage1"
+g4start=`date +"%s"`.0
 lar -c standard_g4_protodunehd_stage1.fcl \
     ${prodname}.root \
-    -o ${g4stage1_name}.root
-
-# Stage 2 G4 -- No SCE
-g4stage2_name="${g4stage1_name}_g4_stage2_sce_off"
-lar -c  standard_g4_protodunehd_stage2.fcl \
-    ${g4stage1_name}.root \
-    -o ${g4stage2_name}.root
-
-# Detsim
-detsim_name="${g4stage2_name}_detsim"
-lar -c standard_detsim_protodunehd.fcl \
-    ${g4stage2_name}.root \
-    -o ${detsim_name}.root 
-
-# Reco
-reco_name="${detsim_name}_reco"
-lar -c standard_reco_protodunehd.fcl \
-    ${detsim_name}.root \
-    -o ${reco_name}.root
-
-#overrides=""
-python ${INPUT_DIR}/pdhd_meta_writer.py \
-       --json ${INPUT_DIR}/pdhd_base_meta.json \
-       --overrides ${overrides} \
-       --parent ${prodname}.root \
-       -o ${reco_name}.root.json
-
-
-if [ $? -ne 0 ]
-then
-  echo "Exiting with error"
-  exit 1
-else
-  echo "$pfn" > justin-processed-pfns.txt
+    -o ${g4stage1_name}.root >g4stage1.log 2>&1
+g4stage1Exit=$?
+if [ $g4stage1Exit -ne 0 ]; then
+  echo "Error in g4stage1"
+  tail -100 g4stage1.log
+  exit 
 fi
+g4end=`date +"%s"`.0
+
+# Make metadata
+#overrides="dune_mc.h4_input_file=H4_v34b_1GeV_-27.7_10M_${filenum}.root \
+# dune_mc.h4_input_iteration=${iter} \
+# core.start_time=${g4start} \
+# core.end_time=${g4end} \
+#"
+#python ${INPUT_DIR}/pdhd_meta_writer.py \
+#       --json ${INPUT_DIR}/pdhd_base_meta.json \
+#       --overrides ${overrides} \
+#       --run ${filenum} \
+#       --event ${eventnum} \
+#       --nevents ${nevents} \
+#       -o ${g4stage1_name}.root.json
+#if [ $? -ne 0 ]; then
+#  echo "Error writing g4stage1 json"
+#  exit 1
+#fi
+
+if [ -z ${NO_SCE_OFF} ]; then
+  # Stage 2 G4 -- No SCE
+  echo "Running g4stage2"
+  g4stage2_name="${g4stage1_name}_g4_stage2_sce_off"
+  lar -c  standard_g4_protodunehd_stage2.fcl \
+      ${g4stage1_name}.root \
+      -o ${g4stage2_name}.root >g4stage2.log 2>&1
+  g4stage2Exit=$?
+  if [ $g4stage2Exit -ne 0 ]; then
+    echo "Error in g4stage2"
+    tail -100 g4stage2.log
+    exit 
+  fi
+  
+  # Detsim
+  echo "Running detsim"
+  detsim_name="${g4stage2_name}_detsim"
+  lar -c standard_detsim_protodunehd.fcl \
+      ${g4stage2_name}.root \
+      -o ${detsim_name}.root  >detsim.log 2>&1
+  detsimExit=$?
+  if [ $detsimExit -ne 0 ]; then
+    echo "Error in detsim"
+    tail -100 detsim.log
+    exit 
+  fi
+  
+  # Reco
+  echo "Running reco"
+  reco_name="${detsim_name}_reco"
+  recostart=`date +"%s"`.0
+  lar -c standard_reco_protodunehd.fcl \
+      ${detsim_name}.root \
+      -o ${reco_name}.root >reco.log 2>&1
+  recoExit=$?
+  if [ $recoExit -ne 0 ]; then
+    echo "Error in reco"
+    tail -100 reco.log
+    exit 
+  fi
+  recoend=`date +"%s"`.0
+  
+  # Make metadata
+  overrides="core.data_tier=full-reconstructed \
+   core.application.version=${DUNE_VERSION} \
+   dune.config_file=standard_reco_protodunehd.fcl \
+   core.start_time=${recostart} \
+   core.end_time=${recoend} \
+   core.application.name=reco \
+   core.application=art.reco \
+  "
+  
+  namespace=${JUSTIN_SCOPE:-"usertests"}
+  
+  python ${INPUT_DIR}/pdhd_meta_writer.py \
+         --json ${INPUT_DIR}/pdhd_base_meta.json \
+         --overrides ${overrides} \
+         --run ${filenum} \
+         --event ${eventnum} \
+         --nevents ${nevents} \
+         -o ${reco_name}.root.json
+         #--parent "${namespace}:${g4stage1_name}.root" \
+  
+  
+  if [ $? -ne 0 ]; then
+    echo "Error writing reco json"
+    exit 1
+  fi
+fi
+
+# Stage 2 G4 -- With SCE
+if [ -z ${NO_SCE_ON} ]; then
+ echo "Running g4stage2 sce on"
+ g4stage2_name="${g4stage1_name}_g4_stage2_sce_E500"
+ lar -c  standard_g4_protodunehd_stage2_sce_E500.fcl \
+     ${g4stage1_name}.root \
+     -o ${g4stage2_name}.root >g4stage2.log 2>&1
+ g4stage2Exit=$?
+ if [ $g4stage2Exit -ne 0 ]; then
+   echo "Error in g4stage2"
+   tail -100 g4stage2.log
+   exit 
+ fi
+ 
+ # Detsim
+ echo "Running detsim sce on"
+ detsim_name="${g4stage2_name}_detsim"
+ lar -c standard_detsim_protodunehd.fcl \
+     ${g4stage2_name}.root \
+     -o ${detsim_name}.root  >detsim.log 2>&1
+ detsimExit=$?
+ if [ $detsimExit -ne 0 ]; then
+   echo "Error in detsim"
+   tail -100 detsim.log
+   exit 
+ fi
+ 
+ # Reco -- With SCE Corrections
+ ##TODO -- MAKE SURE TO REPLACE WITH THE SCE ON ONE
+ echo "Running reco sce on"
+ reco_name="${detsim_name}_reco"
+ #reco_sce_fcl=${INPUT_DIR}/test_sce_E500.fcl
+ reco_sce_fcl=standard_reco_protodunehd_sce_E500.fcl
+ recostart=`date +"%s"`.0
+ lar -c  $reco_sce_fcl \
+     ${detsim_name}.root \
+     -o ${reco_name}.root >reco.log 2>&1
+ recoExit=$?
+ if [ $recoExit -ne 0 ]; then
+   echo "Error in reco"
+   tail -100 reco.log
+   exit 
+ fi
+ recoend=`date +"%s"`.0
+ 
+ # Make metadata
+ overrides="core.data_tier=full-reconstructed \
+  core.application.version=${DUNE_VERSION} \
+  dune.config_file=${reco_sce_fcl} \
+  core.start_time=${recostart} \
+  core.end_time=${recoend} \
+  core.application.name=reco \
+  core.application=art.reco \
+  dune_mc.space_charge=yes \
+ "
+ 
+ namespace=${JUSTIN_SCOPE:-"usertests"}
+ 
+ python ${INPUT_DIR}/pdhd_meta_writer.py \
+        --json ${INPUT_DIR}/pdhd_base_meta.json \
+        --overrides ${overrides} \
+        --run ${filenum} \
+        --event ${eventnum} \
+        --nevents ${nevents} \
+        -o ${reco_name}.root.json
+        #--parent "${namespace}:${g4stage1_name}.root" \
+  if [ $? -ne 0 ]; then
+    echo "Error writing reco json"
+    exit 1
+  fi
+fi
+
+echo "$pfn" > justin-processed-pfns.txt
