@@ -45,7 +45,7 @@ fi
 
 STARTLINE=${STARTLINE:-0}
 echo "Adding ${STARTLINE} to linenumber ${LINENUMBER}"
-LINENUMBER=$[ LINENUMBER + STARTLINE ]
+LINENUMBER=$(( 10#$LINENUMBER + $STARTLINE ))
 echo $LINENUMBER
 
 # Get the file number and iteration within the file that we want to use
@@ -57,24 +57,44 @@ split=($line)
 iter=${split[1]} || get_nums=false
 filenum=${split[0]} || get_nums=false
 nevents=${split[2]} || get_nums=false
-eventnum=$[ iter * 10 ] || get_nums=false
+
+#art Event counting is 1-indexed,
+#but need 0-indexed for particle vector
+#so add 1 here -- 1 is subtracted in module
+eventnum=$[ iter * 10 + 1 ] || get_nums=false
+#run=$((10**6 + 1)) || get_nums=false
+#subrun=$(($run*10**5 + $filenum)) || get_nums=false
 if [ $get_nums = false ]; then
   echo "Failed to get numbers from input file"
   exit 1
 fi
 echo "File: ${filenum}"
 echo "Iter: ${iter}"
+echo "eventum: ${eventnum}"
+echo "subrun: ${subrun}"
 
+
+echo "jobsub_id: ${JUSTIN_JOBSUB_ID:-1}"
+run=`echo "${JUSTIN_JOBSUB_ID:-1}" | awk -F '.' '{print $1}'`
+echo "run: $run"
+
+
+  #-e "s/StartEvent: 0/StartEvent: ${iter}/" \
+  #-e "s/StartEvent: 1/StartEvent: ${eventnum}/" \
 sed ${INPUT_DIR}/pdhd_prod.fcl \
   -e "s/_1.root/_${filenum}.root/" \
-  -e "s/StartEvent: 0/StartEvent: ${iter}/" \
-  -e "s/firstRun:    1/firstRun:    ${filenum}/" \
-  -e "s/firstEvent:  1/firstEvent:    ${eventnum}/" > prod.fcl
+  -e "s/firstRun: 1/firstRun: ${run}/" \
+  -e "s/firstSubRun: 1/firstSubRun: ${filenum}/" \
+  -e "s/firstEvent: 1/firstEvent: ${eventnum}/" > prod.fcl
 
 if [ $? -ne 0 ]; then
   echo "Could not edit pdhd_prod.fcl numbers"
   exit 1
 fi
+
+echo "prod.fcl"
+cat prod.fcl
+
 
 nevents=${NEVENTS:-$nevents} #Set from env override or from above
 echo "nevents: $nevents"
@@ -111,7 +131,6 @@ g4end=`date +"%s"`.0
 
 # Make metadata
 #overrides="dune_mc.h4_input_file=H4_v34b_1GeV_-27.7_10M_${filenum}.root \
-# dune_mc.h4_input_iteration=${iter} \
 # core.start_time=${g4start} \
 # core.end_time=${g4end} \
 #"
@@ -177,24 +196,53 @@ if [ -z ${NO_SCE_OFF} ]; then
    core.end_time=${recoend} \
    core.application.name=reco \
    core.application=art.reco \
+   dune_mc.h4_input_file=H4_v34b_1GeV_-27.7_10M_${filenum}.root \
   "
   
   namespace=${JUSTIN_SCOPE:-"usertests"}
   
+  #-- ${filenum} \
   python ${INPUT_DIR}/pdhd_meta_writer.py \
          --json ${INPUT_DIR}/pdhd_base_meta.json \
          --overrides ${overrides} \
-         --run ${filenum} \
          --event ${eventnum} \
          --nevents ${nevents} \
+         --filenum ${filenum} \
+         --jobid ${JUSTIN_JOBSUB_ID} \
+         --past_fcls prod_beam_cosmics_1GeV_protodunehd.fcl \
+                     standard_g4_protodunehd_stage1.fcl \
+                     standard_g4_protodunehd_stage2.fcl \
+                     standard_detsim_protodunehd.fcl \
+         --past_apps gen g4_stage1 g4_stage2 detsim \
          -o ${reco_name}.root.json
-         #--parent "${namespace}:${g4stage1_name}.root" \
   
   
   if [ $? -ne 0 ]; then
     echo "Error writing reco json"
     exit 1
   fi
+
+  ## TODO -- CHECK WITH LEIGH IF WE NEED EVERY PNDR FILE
+  mv Pandora_Events.pndr ${reco_name}_Pandora_Events.pndr
+  if [ $? -ne 0 ]; then
+    echo "Error mving/renaming pndr file"
+    exit 1
+  fi
+
+  ## Write-out PNDR metadata
+  ## Copy from reco json but change data tier and file format
+  overrides="core.data_tier=pandora_info \
+   core.file_format=binary \
+  "
+  python ${INPUT_DIR}/pdhd_meta_writer.py \
+         --json ${reco_name}.root.json \
+         --overrides ${overrides} \
+         --filenum ${filenum} \
+         --event ${eventnum} \
+         --nevents ${nevents} \
+         --jobid ${JUSTIN_JOBSUB_ID} \
+         -o ${reco_name}_Pandora_Events.pndr.json
+
 fi
 
 # Stage 2 G4 -- With SCE
@@ -251,6 +299,7 @@ if [ -z ${NO_SCE_ON} ]; then
   core.application.name=reco \
   core.application=art.reco \
   dune_mc.space_charge=yes \
+  dune_mc.h4_input_file=H4_v34b_1GeV_-27.7_10M_${filenum}.root \
  "
  
  namespace=${JUSTIN_SCOPE:-"usertests"}
@@ -258,15 +307,44 @@ if [ -z ${NO_SCE_ON} ]; then
  python ${INPUT_DIR}/pdhd_meta_writer.py \
         --json ${INPUT_DIR}/pdhd_base_meta.json \
         --overrides ${overrides} \
-        --run ${filenum} \
+        --filenum ${filenum} \
         --event ${eventnum} \
         --nevents ${nevents} \
+        --jobid ${JUSTIN_JOBSUB_ID} \
+        --past_fcls prod_beam_cosmics_1GeV_protodunehd.fcl \
+                    standard_g4_protodunehd_stage1.fcl \
+                    standard_g4_protodunehd_stage2_sce_E500.fcl \
+                    standard_detsim_protodunehd.fcl \
+        --past_apps gen g4_stage1 g4_stage2 detsim \
         -o ${reco_name}.root.json
         #--parent "${namespace}:${g4stage1_name}.root" \
   if [ $? -ne 0 ]; then
     echo "Error writing reco json"
     exit 1
   fi
+
+
+  ## TODO -- CHECK WITH LEIGH IF WE NEED EVERY PNDR FILE
+  mv Pandora_Events.pndr ${reco_name}_Pandora_Events.pndr
+  if [ $? -ne 0 ]; then
+    echo "Error mving/renaming pndr file"
+    exit 1
+  fi
+
+  ## Write-out PNDR metadata
+  ## Copy from reco json but change data tier and file format
+  overrides="core.data_tier=pandora_info \
+   core.file_format=binary \
+  "
+  python ${INPUT_DIR}/pdhd_meta_writer.py \
+         --json ${reco_name}.root.json \
+         --overrides ${overrides} \
+         --filenum ${filenum} \
+         --event ${eventnum} \
+         --nevents ${nevents} \
+         --jobid ${JUSTIN_JOBSUB_ID} \
+         -o ${reco_name}_Pandora_Events.pndr.json
+
 fi
 
 echo "$pfn" > justin-processed-pfns.txt
