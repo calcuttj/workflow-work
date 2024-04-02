@@ -62,26 +62,15 @@ if __name__ == '__main__':
     if args.past_apps is None or len(args.past_fcls) != len(args.past_apps):
       raise ValueError('Need to provide same number of past apps and fcls')
 
-    in_dict['metadata']['progenitor.applications.names'] = args.past_apps
-    in_dict['metadata']['progenitor.applications.config_files'] = {
+    in_dict['metadata']['origin.applications.names'] = args.past_apps
+    in_dict['metadata']['origin.applications.config_files'] = {
       args.past_apps[i]:args.past_fcls[i] for i in range(len(args.past_apps))
     }
 
-    in_dict['metadata']['progenitor.applications.versions'] = {
+    in_dict['metadata']['origin.applications.versions'] = {
       args.past_apps[i]:in_dict['metadata']['core.application.version']
       for i in range(len(args.past_apps))
     }
-
-    ##
-    #in_dict['metadata']['progenitor.config_files'] = args.past_fcls
-    #in_dict['metadata']['progenitor.application_versions'] = [
-    #  in_dict['metadata']['core.application.version']
-    #  for i in range(len(args.past_apps))
-    #]
-    #in_dict['metadata']['core.progenitor_config_files'] = args.past_fcls
-    #in_dict['metadata']['core.progenitor_application_names'] = args.past_apps
-    #in_dict['metadata']['core.progenitor_application_versions'] = (
-    #  [in_dict['metadata']['core.application.version'] for i in range(len(args.past_apps))])
 
 
   # Serializing json

@@ -1,6 +1,14 @@
 from argparse import ArgumentParser as ap
 import subprocess
 
+def add_tar_cmd(args):
+  if args.tars is not None:
+    results = []
+    tar_dict = build_tar_dict(args)
+    for tarname, (scriptname, tardir) in tar_dict.items():
+      results += ['--env', f'{scriptname}={tardir}']
+  return results
+
 def check_tar_str(args):
   if args.simpletar: return
 

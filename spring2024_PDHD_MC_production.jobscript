@@ -99,10 +99,16 @@ cat prod.fcl
 nevents=${NEVENTS:-$nevents} #Set from env override or from above
 echo "nevents: $nevents"
 
+if [ $nevents -eq 0 ]; then
+  echo "No events in this line -- exiting safely"
+  echo "$pfn" > justin-processed-pfns.txt
+  exit
+fi
+
 # Run Generator
 echo "Running prod"
 now=$(date -u +"%Y%m%dT%H%M%SZ")
-prodname="prod_beam_p1GeV_cosmics_protodunehd_${now}"
+prodname="prod_beam_p1GeV_cosmics_protodunehd_${now}_${run}_${pfn}"
 lar -c prod.fcl \
     -o ${prodname}.root \
     -n ${nevents} >prod.log 2>&1
@@ -110,7 +116,7 @@ prodExit=$?
 if [ $prodExit -ne 0 ]; then
   echo "Error in prod"
   tail -100 prod.log
-  exit 
+  exit $prodExit
 fi
 
 
@@ -125,7 +131,7 @@ g4stage1Exit=$?
 if [ $g4stage1Exit -ne 0 ]; then
   echo "Error in g4stage1"
   tail -100 g4stage1.log
-  exit 
+  exit $g4stage1Exit
 fi
 g4end=`date +"%s"`.0
 
@@ -157,7 +163,7 @@ if [ -z ${NO_SCE_OFF} ]; then
   if [ $g4stage2Exit -ne 0 ]; then
     echo "Error in g4stage2"
     tail -100 g4stage2.log
-    exit 
+    exit $g4stage2Exit
   fi
   
   # Detsim
@@ -170,7 +176,7 @@ if [ -z ${NO_SCE_OFF} ]; then
   if [ $detsimExit -ne 0 ]; then
     echo "Error in detsim"
     tail -100 detsim.log
-    exit 
+    exit $detsimExit
   fi
   
   # Reco
@@ -184,7 +190,7 @@ if [ -z ${NO_SCE_OFF} ]; then
   if [ $recoExit -ne 0 ]; then
     echo "Error in reco"
     tail -100 reco.log
-    exit 
+    exit $recoExit
   fi
   recoend=`date +"%s"`.0
   
@@ -243,6 +249,16 @@ if [ -z ${NO_SCE_OFF} ]; then
          --jobid ${JUSTIN_JOBSUB_ID} \
          -o ${reco_name}_Pandora_Events.pndr.json
 
+  echo "All logs:"
+  echo "-----------G4 STAGE2------------"
+  cat g4stage2.log
+  echo "--------------------------------"
+  echo "-----------DETSIM---------------"
+  cat detsim.log
+  echo "--------------------------------"
+  echo "-----------RECO-----------------"
+  cat reco.log
+  echo "--------------------------------"
 fi
 
 # Stage 2 G4 -- With SCE
@@ -256,7 +272,7 @@ if [ -z ${NO_SCE_ON} ]; then
  if [ $g4stage2Exit -ne 0 ]; then
    echo "Error in g4stage2"
    tail -100 g4stage2.log
-   exit 
+   exit $g4stage2Exit
  fi
  
  # Detsim
@@ -269,7 +285,7 @@ if [ -z ${NO_SCE_ON} ]; then
  if [ $detsimExit -ne 0 ]; then
    echo "Error in detsim"
    tail -100 detsim.log
-   exit 
+   exit $detsimExit
  fi
  
  # Reco -- With SCE Corrections
@@ -286,7 +302,7 @@ if [ -z ${NO_SCE_ON} ]; then
  if [ $recoExit -ne 0 ]; then
    echo "Error in reco"
    tail -100 reco.log
-   exit 
+   exit $recoExit
  fi
  recoend=`date +"%s"`.0
  
@@ -344,6 +360,17 @@ if [ -z ${NO_SCE_ON} ]; then
          --nevents ${nevents} \
          --jobid ${JUSTIN_JOBSUB_ID} \
          -o ${reco_name}_Pandora_Events.pndr.json
+
+  echo "All logs:"
+  echo "-----------G4 STAGE2------------"
+  cat g4stage2.log
+  echo "--------------------------------"
+  echo "-----------DETSIM---------------"
+  cat detsim.log
+  echo "--------------------------------"
+  echo "-----------RECO-----------------"
+  cat reco.log
+  echo "--------------------------------"
 
 fi
 
