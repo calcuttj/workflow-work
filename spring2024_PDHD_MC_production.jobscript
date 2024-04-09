@@ -2,6 +2,14 @@
 #
 source /cvmfs/dune.opensciencegrid.org/products/dune/setup_dune.sh
 
+#First check the existence of this,
+#there are sometimes spurrious site issues preventing access
+stat ${INPUT_DIR}/all_h4_prod_nums.txt
+if [ $? -ne 0 ]; then
+  echo "Failed to stat input list. Exiting safely"
+  exit 0
+fi
+
 #Setup recent lar software suite
 DUNE_VERSION=${DUNE_VERSION:-v09_85_00d00}
 setup dunesw \

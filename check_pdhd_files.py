@@ -11,13 +11,7 @@ def print_counts(counts):
   for i, j in counts.items():
     if j > 1: print(i, j)
 
-if __name__ == '__main__':
-
-  parser = ap()
-  parser.add_argument('-w', type=str, required=True)
-  #parser.add_argument('--pandora', action='store_true')
-  args = parser.parse_args()
-
+def build_queries(args):
   sce_on_reco_query = (
     f"files where dune.workflow['workflow_id'] in ({args.w}) "
     ' and dune.output_status=confirmed and dune_mc.space_charge=yes '
@@ -28,6 +22,25 @@ if __name__ == '__main__':
       'space_charge=yes', 'space_charge=no')
   sce_off_pandora_query = sce_on_pandora_query.replace(
       'space_charge=yes', 'space_charge=no')
+  return {
+    'sce_on_pandora':sce_on_pandora_query,
+    'sce_off_pandora':sce_off_pandora_query,
+    'sce_on_reco':sce_on_reco_query,
+    'sce_off_reco':sce_off_reco_query,
+  }
+
+if __name__ == '__main__':
+
+  parser = ap()
+  parser.add_argument('-w', type=str, required=True)
+  #parser.add_argument('--pandora', action='store_true')
+  args = parser.parse_args()
+
+  queries = build_queries(args)
+  sce_on_pandora_query = queries['sce_on_pandora']
+  sce_off_pandora_query = queries['sce_off_pandora']
+  sce_on_reco_query = queries['sce_on_reco']
+  sce_off_reco_query = queries['sce_off_reco']
 
   mc = MetaCatClient()
   sce_off_pandora_files = mc.query(sce_off_pandora_query)

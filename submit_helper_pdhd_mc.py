@@ -28,7 +28,8 @@ def build_output(args):
 
   outputs = [
     (f'*sce_{sce}{t[0]}:pdhd_1gev_beam_cosmics_{status}_sce_{sce.lower()}_{t[1]}' +
-     f'_limit{args.limit}_skip{args.skip}' +
+     ('_limit_end' if args.end else f'_limit{args.limit}') +
+     f'_skip{args.skip}' +
      ('_$JUSTIN_WORKFLOW_ID' if args.wid_out else '')
     )
     for t in types for sce in sce_settings
@@ -59,6 +60,7 @@ if __name__ == '__main__':
   parser.add_argument('--memory', default=5500, type=str, help='Requested memory')
   parser.add_argument('--nevents', type=int, default=None)
   parser.add_argument('--slash', action='store_true')
+  parser.add_argument('--end', action='store_true')
   args = parser.parse_args()
 
   submit_helper.check_tar_str(args)
