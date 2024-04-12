@@ -17,29 +17,54 @@ def get_file_num(f):
   return int(f.split('_')[-1].replace('.root', ''))
 
 def check_rucio(args, files, name, index=-9):
+
   print('Checking', name)
+
+  #Get rucio client API
   rc = ReplicaClient()
-  nfiles = len(files) #sce_on_reco_files)
   no_rse_files = []
   no_rse_dicts = []
+
+  #Have to separate the list of files into batches of 1k (can possible tune this)
+  #so as to not overload the rucio server
+  #(I think... it spits an error for O(10k))
+  nfiles = len(files)
   for i_start in range(0, nfiles, 1000):
+
+    #Build up list of did dictionaries
     dids = [
         {'scope':f['namespace'], 'name':f['name']}
         for f in files[i_start:i_start+1000]
     ]
-    reps = [f for f in rc.list_replicas(dids)]
-    for rep in reps:
+
+    #Get the replicas and unpack here
+    #reps = [f for f in rc.list_replicas(dids)]
+
+    #Loop over the results from the replicas
+    #for rep in reps:
+    for rep in rc.list_replicas(dids):
+
+      #If there are no RSEs add to list
       if len(rep['rses']) == 0:
-        #print('Found 0 rses', rep['name'])
         no_rse_files.append(f"{rep['scope']}:{rep['name']}\n")
         no_rse_dicts.append(rep)
+
+      #I'm not sure if this is also necessary -- but it will spit out if any
+      #replicas are unavailable
       for rse,state in rep['states'].items():
         if state != 'AVAILABLE':
           print(rep['name'], 'has state', state, 'at', rse)
+
+  #Write out the no-replica files
   with open(f'{args.w}_{name}_missing_replicas.txt', 'w') as f:
     f.writelines(no_rse_files)
+  
+  #Also get the pfn/numbers from the files as well -- for other checks later
+  #Might get rid of this since I think the order of ops should be
+  # 1. Get the no-replica files
+  # 2. Data management scrubs those from metacat and rucio DBs
+  # 3. I recheck for makeup
   no_rse_pfns = get_pfns(no_rse_dicts, index)
-  #print(no_rse_pfns)
   return no_rse_pfns
 
   
@@ -129,25 +154,24 @@ def process(args):
   with open(args.w + '_makeup.txt', 'w') as f: f.writelines(to_makeup)
 
 
-  # Look through the files and see if the replica exists in rucio
-  no_replica_pfns = {
-    'sce_off_pandora_pfns':check_rucio(args, sce_off_pandora_files, 'sce_off_pandora', -11),
-    'sce_on_pandora_pfns':check_rucio(args, sce_on_pandora_files, 'sce_on_pandora', -11),
-    'sce_off_reco_pfns':check_rucio(args, sce_off_reco_files, 'sce_off_reco'),
-    'sce_on_reco_pfns':check_rucio(args, sce_on_reco_files, 'sce_on_reco'),
-  }
+def replicas(args):
+  #Get metacat client
+  mc = MetaCatClient()
 
-  missing_replica_lists = []
-  all_missing_replica_pfns = []
-  for name, pfn_list in no_replica_pfns.items():
-    print(name)
-    missing_replica_lists.append(pfn_list)
-    all_missing_replica_pfns += pfn_list
-    #print('\tMissing:', missing)
+  #Build queries from workflow
+  queries = build_queries(args)
 
-  all_missing_replica_pfns = list(set(all_missing_replica_pfns))
-  all_missing_replica_pfns.sort()
-  #print('All missing', all_missing_replica_pfns)
+  #Get the files
+  sce_off_pandora_files = [f for f in mc.query(queries['sce_off_pandora'], with_metadata=True)]
+  sce_on_pandora_files = [f for f in mc.query(queries['sce_on_pandora'], with_metadata=True)]
+  sce_off_reco_files = [f for f in mc.query(queries['sce_off_reco'], with_metadata=True)]
+  sce_on_reco_files = [f for f in mc.query(queries['sce_on_reco'], with_metadata=True)]
+
+  #Check the files
+  check_rucio(args, sce_off_pandora_files, 'sce_off_pandora', -11)
+  check_rucio(args, sce_on_pandora_files, 'sce_on_pandora', -11)
+  check_rucio(args, sce_off_reco_files, 'sce_off_reco')
+  check_rucio(args, sce_on_reco_files, 'sce_on_reco')
 
 if __name__ == '__main__':
 
@@ -160,12 +184,14 @@ if __name__ == '__main__':
   parser.add_argument('--routine', type=str, default='process',
                       choices=[
                         'process', 'check_input',
+                        'replicas',
                       ])
   args = parser.parse_args()
 
   routines = {
     'process':process,
     'check_input':check_input,
+    'replicas':replicas,
   }
 
   routines[args.routine](args)
