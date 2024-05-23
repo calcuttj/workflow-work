@@ -1,0 +1,102 @@
+#!/bin/bash
+#
+source /cvmfs/dune.opensciencegrid.org/products/dune/setup_dune.sh
+setup metacat
+export METACAT_SERVER_URL=https://metacat.fnal.gov:9443/dune_meta_prod/app
+export METACAT_AUTH_SERVER_URL=https://metacat.fnal.gov:8143/auth/dune
+##Check?
+
+#First check the existence of this,
+#there are sometimes spurrious site issues preventing access
+stat ${DR_DIR}/rerun_reco.fcl
+if [ $? -ne 0 ]; then
+  echo "Failed to stat input list. Exiting safely"
+  exit 0
+fi
+
+#Setup recent lar software suite
+DUNE_VERSION=${DUNE_VERSION:-v09_85_00d00}
+setup dunesw \
+   "${DUNE_VERSION}" \
+   -q "${DUNE_QUALIFIER:-e26:prof}"
+
+if [ $? -ne 0 ]; then
+  echo "Failed to setup dunesw $DUNE_VERSION $DUNE_QUALIFIER"
+fi
+
+echo "DUNESW loc:"
+ups active | grep dunesw
+
+if [ -z ${JUSTIN_PROCESSORS} ]; then
+  JUSTIN_PROCESSORS=1
+fi
+
+echo "Justin processors: ${JUSTIN_PROCESSORS}"
+
+export TF_NUM_THREADS=${JUSTIN_PROCESSORS}   
+export OPENBLAS_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export JULIA_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export MKL_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export NUMEXPR_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export OMP_NUM_THREADS=${JUSTIN_PROCESSORS}  
+
+echo "printing env"
+env
+
+echo "Will use justin-get-file"
+#
+DID_PFN_RSE=`$JUSTIN_PATH/justin-get-file`
+##Check that any file was returned
+if [ "${DID_PFN_RSE}" == "" ] ; then
+  echo "Could not get file"
+  exit 0
+fi
+
+
+pfn=`echo ${DID_PFN_RSE} | cut -f2 -d' '`
+did=`echo ${DID_PFN_RSE} | cut -f1 -d' '`
+echo "pfn: ${pfn}"
+now=$(date -u +"%Y%m%dT%H%M%SZ")
+filename=`echo $did | cut -f2 -d ':' | sed -e "s/.root/_${now}_rerun_reco.root/"`
+
+
+nevents=${NEVENTS:--1}
+
+echo "Running reco"
+touch reco.log
+starttime=`date +"%s"`.0
+lar -c ${DR_DIR}/rerun_reco.fcl \
+    -n ${nevents} \
+    -o ${filename} \
+    ${pfn} # >reco.log 2>&1
+larExit=$?
+endtime=`date +"%s"`.0
+
+if [ $larExit -ne 0 ]; then
+  echo "Error in reco"
+  cat reco.log
+  exit $larExit
+fi
+
+echo "Ran successfully"
+
+echo "Forming metadata"
+
+python ${DR_DIR}/dress_rehearsal_meta_writer.py \
+    --parent_did ${did} \
+    -o ${filename}.json \
+    -n ${nevents} \
+    --start ${starttime} \
+    --end ${endtime}
+
+mdExit=$?
+if [ $mdExit -ne 0 ]; then
+  echo "Error in md creation"
+  exit $mdExit
+fi
+
+echo "formed"
+
+cat ${filename}.json
+
+echo "$pfn" > justin-processed-pfns.txt

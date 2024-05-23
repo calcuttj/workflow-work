@@ -1,0 +1,150 @@
+#!/bin/bash
+#
+
+#These must be defined
+if [ -z $FCL_FILE ]; then
+  echo "Fatal Must provide FCL_FILE env var"
+  exit 1
+fi
+
+if [ -z $NTUPLE_DIR ]; then
+  echo "Fatal Must provide NTUPLE_DIR env var"
+  exit 1
+fi
+
+stat ${NTUPLE_DIR}
+if [ $? -ne 0 ]; then
+  echo "Failed to $NTUPLE_DIR. Exiting safely"
+  exit 0
+fi
+
+source /cvmfs/dune.opensciencegrid.org/products/dune/setup_dune.sh
+setup metacat
+export METACAT_SERVER_URL=https://metacat.fnal.gov:9443/dune_meta_prod/app
+export METACAT_AUTH_SERVER_URL=https://metacat.fnal.gov:8143/auth/dune
+
+if [ -n "$PROTODUNEANA_TAR" ]; then
+  stat ${PROTODUNEANA_TAR}
+  if [ $? -ne 0 ]; then
+    echo "Failed to stat $PROTODUNEANA_TAR. Exiting safely"
+    exit 0
+  fi
+
+  export PRODUCTS=$PROTODUNEANA_TAR:$PRODUCTS 
+  echo "Set protoduneana to $PROTODUNEANA_TAR"
+fi
+
+
+#Setup recent lar software suite
+DUNE_VERSION=${DUNE_VERSION:-v09_81_00d01}
+setup dunesw \
+   "${DUNE_VERSION}" \
+   -q "${DUNE_QUALIFIER:-e26:prof}"
+
+setup_exit=$?
+if [ $? -ne 0 ]; then
+  echo "Failed to setup dunesw $DUNE_VERSION $DUNE_QUALIFIER"
+  exit $setup_exit
+fi
+
+
+echo "DUNESW loc:"
+ups active | grep dunesw
+
+if [ -z ${JUSTIN_PROCESSORS} ]; then
+  JUSTIN_PROCESSORS=1
+fi
+
+echo "Justin processors: ${JUSTIN_PROCESSORS}"
+
+export TF_NUM_THREADS=${JUSTIN_PROCESSORS}   
+export OPENBLAS_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export JULIA_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export MKL_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export NUMEXPR_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export OMP_NUM_THREADS=${JUSTIN_PROCESSORS}  
+
+echo "printing env"
+env
+
+echo "Justin specific env vars"
+env | grep JUSTIN
+
+echo "Will use justin-get-file"
+#
+
+nfiles=${NFILES:-1}
+
+python $NTUPLE_DIR/ntuple_prod_utils.py get_nfiles_justin \
+    -n $nfiles \
+    --dids input_dids.list \
+    --pfns input_pfns.list
+
+#pfn_exit=$?
+#if [ $pfn_exit -ne 0 ]; then
+#  echo "Error in get_nfiles_justin. Exiting"
+#  exit $pfn_exit
+#fi
+
+n_files_retrieved=`wc -l input_pfns.list | cut -f1 -d' '`
+echo "Files retrieved: ${n_files_retrieved}"
+
+if [ $n_files_retrieved -eq 0 ]; then
+  echo "No files retrieved. Exiting safely"
+  exit 0
+fi
+
+pfn_list=`cat input_pfns.list`
+echo "PFN list:"
+echo $pfn_list
+
+now=$(date -u +"%Y%m%dT%H%M%SZ")
+
+##TODO -- edit this
+#jobid=`echo "${JUSTIN_JOBSUB_ID:-1}" | awk -F '.' '{print $1}'`
+jobid=`echo "${JUSTIN_JOBSUB_ID:-1}" | cut -f1 -d'@' | sed -e "s/\./_/"`
+OUTFILE="pdspana_${jobid}_${JUSTIN_STAGE_ID}_${JUSTIN_WORKFLOW_ID}_${now}.root"
+
+
+nevents=${NEVENTS:--1}
+
+echo "Running pdspana"
+touch ana.log
+starttime=`date +"%s"`.0
+lar -c ${FCL_FILE} \
+    -n ${nevents} \
+    -T ${OUTFILE} \
+    -s ${pfn_list}  >ana.log 2>&1
+larExit=$?
+endtime=`date +"%s"`.0
+
+if [ $larExit -ne 0 ]; then
+  echo "Error in ntuple production"
+  cat ana.log
+  exit $larExit
+fi
+
+echo "Ran successfully"
+
+echo "Forming metadata"
+
+### Get the metadata
+python $NTUPLE_DIR/ntuple_prod_utils.py \
+  metadata \
+  --root_file ${OUTFILE} \
+  --dids input_dids.list \
+  --version ${DUNE_VERSION} \
+  --fcl_name ${FCL_FILE} \
+  --log_file md.log \
+  -o $OUTFILE.json
+mdExit=$?
+if [ $mdExit -ne 0 ]; then
+  echo "Error in ntuple metdata production"
+  cat md.log
+  exit $mdExit
+fi
+
+echo "formed"
+cat ${OUTFILE}.json
+
+echo "$pfn_list" > justin-processed-pfns.txt
