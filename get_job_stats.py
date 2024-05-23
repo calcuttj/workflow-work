@@ -29,7 +29,7 @@ def do_vis(times, args):
   plt.show()
 
 def print_sizes(sizes, args):
-  unit = 'MB' if args.mb else 'BG'
+  unit = 'MB' if args.mb else 'GB'
   print(f'Mean size: {np.mean(sizes):.2f}{unit}')
   print(f'Max size: {np.max(sizes):.2f}{unit}')
   print(f'sigma: {np.std(sizes):.2f}{unit}')
@@ -59,6 +59,7 @@ if __name__ == '__main__':
 
   print(f'Mean time: {np.mean(times):.0f}s')
   print(f'Max time: {np.max(times)}s')
+  print(f'Std dev time: {np.std(times):.2f}')
   print(f'Mean + 2sigma: {np.mean(times) + 2*np.std(times):.2f}s')
   print(f'Estimated 95%: {np.sort(times)[int(.95*len(times))]:.2f}s')
 

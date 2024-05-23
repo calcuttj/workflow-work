@@ -7,6 +7,7 @@ if __name__ == '__main__':
   parser.add_argument('--json', type=str, default=None)
   parser.add_argument('--overrides', type=str, nargs='+') ##TODO -- Write help
   parser.add_argument('--parent', type=str, default=None)
+  parser.add_argument('--inherit_run', action='store_true')
   parser.add_argument('-o', type=str, required=True)
   parser.add_argument('--jobid')
   #parser.add_argument('--run', type=int, default=1)
@@ -15,6 +16,7 @@ if __name__ == '__main__':
   parser.add_argument('--nevents', type=int, required=True)
   parser.add_argument('--past_fcls', type=str, nargs='+')
   parser.add_argument('--past_apps', type=str, nargs='+')
+  parser.add_argument('--exclude', type=str, nargs='+')
   #parser.add_argument('--momentum', type=float, default=1.)
   args = parser.parse_args()
 
@@ -30,17 +32,25 @@ if __name__ == '__main__':
 
   #print(in_dict)
 
+  if args.exclude is not None:
+    for exc in args.exclude:
+      if exc in in_dict['metadata'].keys():
+        del in_dict['metadata'][exc]
+
   if args.overrides is not None:
     for override in args.overrides:
       split = override.split('=')
       #print(split[0], split[1])
-      in_dict['metadata'][split[0]] = split[1]
+      val = split[1]
+      if 'time' in split[0].lower():
+        val = float(val)
+      in_dict['metadata'][split[0]] = val #split[1]
 
   #print(in_dict)
 
   if args.parent is not None:
-    name = args.parent.split(':')[0]
-    namespace = args.parent.split(':')[1]
+    name = args.parent.split(':')[1]
+    namespace = args.parent.split(':')[0]
     in_dict['parents'] = [
       {"name": name,
        "namespace": namespace 
@@ -48,15 +58,27 @@ if __name__ == '__main__':
     ]
 
   in_dict['metadata']['core.event_count'] = args.nevents
-  if type(args.jobid) is str:
-    run=int(args.jobid.split('.')[0])
+  if args.inherit_run and args.parent is not None:
+    from metacat.webapi import MetaCatClient
+    mc = MetaCatClient()
+    parent_dict = mc.get_file(did=args.parent, with_provenance=False)
+    parent_metadata = parent_dict['metadata']
+    in_dict['metadata']['core.runs'] = parent_metadata['core.runs']
+    in_dict['metadata']['core.runs_subruns'] = parent_metadata['core.runs_subruns']
+    in_dict['metadata']['core.first_event_number'] = (
+        parent_metadata['core.first_event_number'])
+    in_dict['metadata']['core.last_event_number'] = (
+        parent_metadata['core.first_event_number'] + args.nevents - 1)
   else:
-    run = args.jobid 
-  in_dict['metadata']['core.runs'] = [run]
-  in_dict['metadata']['core.subruns'] = [run*10**5 + args.filenum]
-  in_dict['metadata']['core.first_event_number'] = args.event
-  in_dict['metadata']['core.last_event_number'] = (
-      args.event + args.nevents - 1)
+    if type(args.jobid) is str:
+      run=int(args.jobid.split('.')[0])
+    else:
+      run = args.jobid 
+    in_dict['metadata']['core.runs'] = [run]
+    in_dict['metadata']['core.runs_subruns'] = [run*10**5 + args.filenum]
+    in_dict['metadata']['core.first_event_number'] = args.event
+    in_dict['metadata']['core.last_event_number'] = (
+        args.event + args.nevents - 1)
 
   if args.past_fcls is not None:
     if args.past_apps is None or len(args.past_fcls) != len(args.past_apps):

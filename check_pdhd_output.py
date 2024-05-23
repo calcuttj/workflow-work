@@ -111,15 +111,15 @@ def process(args):
   queries = build_queries(args)
  
   mc = MetaCatClient()
-  sce_off_pandora_files = [f for f in mc.query(queries['sce_off_pandora'], with_metadata=True)]
-  sce_on_pandora_files = [f for f in mc.query(queries['sce_on_pandora'], with_metadata=True)]
+  #sce_off_pandora_files = [f for f in mc.query(queries['sce_off_pandora'], with_metadata=True)]
+  #sce_on_pandora_files = [f for f in mc.query(queries['sce_on_pandora'], with_metadata=True)]
   sce_off_reco_files = [f for f in mc.query(queries['sce_off_reco'], with_metadata=True)]
   sce_on_reco_files = [f for f in mc.query(queries['sce_on_reco'], with_metadata=True)]
 
   #Get PFN numbers for each subset of output
   pfns = {
-    'sce_off_pandora_pfns':get_pfns(sce_off_pandora_files, -11),
-    'sce_on_pandora_pfns':get_pfns(sce_on_pandora_files, -11),
+    #'sce_off_pandora_pfns':get_pfns(sce_off_pandora_files, -11),
+    #'sce_on_pandora_pfns':get_pfns(sce_on_pandora_files, -11),
     'sce_off_reco_pfns':get_pfns(sce_off_reco_files),
     'sce_on_reco_pfns':get_pfns(sce_on_reco_files),
   }
@@ -162,14 +162,14 @@ def replicas(args):
   queries = build_queries(args)
 
   #Get the files
-  sce_off_pandora_files = [f for f in mc.query(queries['sce_off_pandora'], with_metadata=True)]
-  sce_on_pandora_files = [f for f in mc.query(queries['sce_on_pandora'], with_metadata=True)]
+  #sce_off_pandora_files = [f for f in mc.query(queries['sce_off_pandora'], with_metadata=True)]
+  #sce_on_pandora_files = [f for f in mc.query(queries['sce_on_pandora'], with_metadata=True)]
   sce_off_reco_files = [f for f in mc.query(queries['sce_off_reco'], with_metadata=True)]
   sce_on_reco_files = [f for f in mc.query(queries['sce_on_reco'], with_metadata=True)]
 
   #Check the files
-  check_rucio(args, sce_off_pandora_files, 'sce_off_pandora', -11)
-  check_rucio(args, sce_on_pandora_files, 'sce_on_pandora', -11)
+  #check_rucio(args, sce_off_pandora_files, 'sce_off_pandora', -11)
+  #check_rucio(args, sce_on_pandora_files, 'sce_on_pandora', -11)
   check_rucio(args, sce_off_reco_files, 'sce_off_reco')
   check_rucio(args, sce_on_reco_files, 'sce_on_reco')
 

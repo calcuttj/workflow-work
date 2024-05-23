@@ -43,18 +43,18 @@ if __name__ == '__main__':
   sce_off_reco_query = queries['sce_off_reco']
 
   mc = MetaCatClient()
-  sce_off_pandora_files = mc.query(sce_off_pandora_query)
-  sce_on_pandora_files = mc.query(sce_on_pandora_query)
+  #sce_off_pandora_files = mc.query(sce_off_pandora_query)
+  #sce_on_pandora_files = mc.query(sce_on_pandora_query)
   sce_off_reco_files = mc.query(sce_off_reco_query)
   sce_on_reco_files = mc.query(sce_on_reco_query)
 
-  sce_off_pandora_pfns = get_pfns(sce_off_pandora_files, -11)
-  sce_on_pandora_pfns = get_pfns(sce_on_pandora_files, -11)
+  #sce_off_pandora_pfns = get_pfns(sce_off_pandora_files, -11)
+  #sce_on_pandora_pfns = get_pfns(sce_on_pandora_files, -11)
   sce_off_reco_pfns = get_pfns(sce_off_reco_files)
   sce_on_reco_pfns = get_pfns(sce_on_reco_files)
 
-  sce_off_pandora_counts = get_counts(sce_off_pandora_pfns)
-  sce_on_pandora_counts = get_counts(sce_on_pandora_pfns)
+  #sce_off_pandora_counts = get_counts(sce_off_pandora_pfns)
+  #sce_on_pandora_counts = get_counts(sce_on_pandora_pfns)
   sce_off_reco_counts = get_counts(sce_off_reco_pfns)
   sce_on_reco_counts = get_counts(sce_on_reco_pfns)
 
@@ -64,11 +64,11 @@ if __name__ == '__main__':
   print('All PFNs SCE Off, Reco:', len(sce_off_reco_pfns))
   print('Unique PFNs SCE Off, Reco:', len(set(sce_off_reco_pfns)))
   print()
-  print('All PFNs SCE On, Pandora:', len(sce_on_pandora_pfns))
-  print('Unique PFNs SCE On, Pandora:', len(set(sce_on_pandora_pfns)))
-  print()
-  print('All PFNs SCE Off, Pandora:', len(sce_off_pandora_pfns))
-  print('Unique PFNs SCE Off, Pandora:', len(set(sce_off_pandora_pfns)))
+  #print('All PFNs SCE On, Pandora:', len(sce_on_pandora_pfns))
+  #print('Unique PFNs SCE On, Pandora:', len(set(sce_on_pandora_pfns)))
+  #print()
+  #print('All PFNs SCE Off, Pandora:', len(sce_off_pandora_pfns))
+  #print('Unique PFNs SCE Off, Pandora:', len(set(sce_off_pandora_pfns)))
   print()
   print('Multiple SCE On, Reco:')
   print_counts(sce_on_reco_counts)
@@ -76,17 +76,17 @@ if __name__ == '__main__':
   print('Multiple SCE Off, Reco:')
   print_counts(sce_off_reco_counts)
   print()
-  print('Multiple SCE On, Pandora:')
-  print_counts(sce_on_pandora_counts)
-  print()
-  print('Multiple SCE Off, Pandora:')
-  print_counts(sce_off_pandora_counts)
-  print()
+  #print('Multiple SCE On, Pandora:')
+  #print_counts(sce_on_pandora_counts)
+  #print()
+  #print('Multiple SCE Off, Pandora:')
+  #print_counts(sce_off_pandora_counts)
+  #print()
 
 
   all_pfns = {
-    'SCE On Pandora':sce_on_pandora_pfns,
-    'SCE Off Pandora':sce_off_pandora_pfns,
+    #'SCE On Pandora':sce_on_pandora_pfns,
+    #'SCE Off Pandora':sce_off_pandora_pfns,
     'SCE On Reco':sce_on_reco_pfns,
     'SCE Off Reco':sce_off_reco_pfns,
   }

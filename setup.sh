@@ -19,3 +19,6 @@ export MQL_REQUEST_FDPROD23_HD_ANU="files from higuera:fardet-hd__fd_mc_2023a__m
 
 export MQL_REQUEST_FDPROD23_VD_NU="files from higuera:fardet-vd__fd_mc_2023a__mc__hit-reconstructed__prodgenie_nu_dunevd10kt_1x8x6_3view_30deg.fcl__v09_75_03d00__preliminary limit 1"
 export MQL_REQUEST_FDPROD23_VD_ANU="files from higuera:fardet-vd__fd_mc_2023a__mc__hit-reconstructed__prodgenie_anu_dunevd10kt_1x8x6_3view_30deg.fcl__v09_75_03d00__preliminary limit 1"
+
+
+export APRIL_DR_QUERY="files from dune:all where dune.workflow['workflow_id'] in (1750, 1752, 1754, 1757, 1763, 1764, 1765, 1766, 1767) and core.data_tier=full-reconstructed and dune_mc.space_charge=yes and core.event_count=10 ordered"
