@@ -1,0 +1,30 @@
+unique_fields: [
+  "core.application.family",
+  "core.application.name",
+  "core.application.version",
+  "core.data_stream",
+  # "core.data_tier",
+  "core.file_format",
+  "core.file_type",
+  "core.run_type",
+  "dune.campaign",
+  "dune.config_file",
+  "dune.daq_test",
+  "origin.applications.config_files",
+  "origin.applications.names",
+  "origin.applications.versions",
+  "retention.class",
+  "retention.status",
+  "core.file_content_status",
+  "dune.output_status",
+]
+
+to_merge: [
+  'core.runs',
+  'core.runs_subruns',
+]
+
+as_set: [
+  'core.runs',
+  'core.runs_subruns',
+]
