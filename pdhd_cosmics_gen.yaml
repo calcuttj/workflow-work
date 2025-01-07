@@ -1,0 +1,35 @@
+time_last: True
+pass_name_through_stages: True
+art_out_base: prod_cosmics_radio_protodunehd
+timestamp_outname: True
+justin_stage_outname: True
+justin_jobid_outname: True
+
+
+job_stages:
+  gen:
+    fcl: prod_cosmics_radiologicals_protodunehd.fcl 
+    nevents: 10
+    
+  #g4_stage1:
+  #  fcl: standard_g4_protodunehd_stage1.fcl
+  #  nevents: -1
+  #  
+  #  art_out: True
+  #  tfile_out: False
+  #g4_stage2:
+  #  fcl: standard_g4_protodunehd_stage1.fcl
+  #  nevents: -1
+  #  art_out: True
+  #  tfile_out: False
+  #detsim:
+  #  fcl: standard_detsim_protodunehd
+  #  nevents: -1
+  #  art_out: True
+  #  tfile_out: False
+  #reco:
+  #  fcl: standard_reco_protodunehd.fcl
+  #  nevents: -1
+  #  art_out: True
+  #  tfile_out: False #TODO -- True
+  #  
