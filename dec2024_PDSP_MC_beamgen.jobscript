@@ -1,0 +1,310 @@
+#!/bin/bash
+#
+
+#These must be defined
+if [ -z $FCL_FILE ]; then
+  echo "Fatal Must provide FCL_FILE env var"
+  exit 1
+fi
+
+if [ -z $UTIL_TAR ]; then
+  echo "Fatal must provide UTIL_TAR env var"
+  exit 1
+fi
+export PYTHONPATH=$UTIL_TAR:$PYTHONPATH
+
+source /cvmfs/dune.opensciencegrid.org/products/dune/setup_dune.sh
+setup metacat
+export METACAT_SERVER_URL=https://metacat.fnal.gov:9443/dune_meta_prod/app
+export METACAT_AUTH_SERVER_URL=https://metacat.fnal.gov:8143/auth/dune
+
+
+ 
+if [ -z ${JUSTIN_PROCESSORS} ]; then
+  JUSTIN_PROCESSORS=1
+fi
+
+echo "Justin processors: ${JUSTIN_PROCESSORS}"
+
+export TF_NUM_THREADS=${JUSTIN_PROCESSORS}   
+export OPENBLAS_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export JULIA_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export MKL_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export NUMEXPR_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export OMP_NUM_THREADS=${JUSTIN_PROCESSORS}  
+
+echo "Justin specific env vars"
+env | grep JUSTIN
+now=$(date -u +"%Y%m%dT%H%M%SZ")
+jobid=`echo "${JUSTIN_JOBSUB_ID:-1}" | cut -f1 -d'@' | sed -e "s/\./_/"`
+export prodname="prod_beam_p0.5GeV_protodunesp_${JUSTIN_STAGE_ID}_${jobid}_${now}"
+a=1
+##Subhell to run dunesw
+# (
+ if [ -n "$DUNESW_TAR" ]; then
+   stat ${DUNESW_TAR}
+   if [ $? -ne 0 ]; then
+     echo "Failed to stat $DUNESW_TAR. Exiting safely"
+     exit 0
+   fi
+ 
+   export PRODUCTS=$DUNESW_TAR:$PRODUCTS 
+   echo "Set dunesw to $DUNESW_TAR"
+ fi
+
+ if [ -n "$WIRECELL_TAR" ]; then
+   stat ${WIRECELL_TAR}
+   if [ $? -ne 0 ]; then
+     echo "Failed to stat $WIRECELL_TAR. Exiting safely"
+     exit 0
+   fi
+ 
+   export PRODUCTS=$WIRECELL_TAR:$PRODUCTS 
+   echo "Set wirecell to $WIRECELL_TAR"
+ fi
+
+ #Setup recent lar software suite
+ DUNESW_VERSION=${DUNESW_VERSION:-v10_01_03d00}
+ setup dunesw \
+    "${DUNESW_VERSION}" \
+    -q "${DUNE_QUALIFIER:-e26:prof}"
+ 
+ setup_exit=$?
+ if [ $? -ne 0 ]; then
+   echo "Failed to setup dunesw $DUNESW_VERSION $DUNE_QUALIFIER"
+   exit $setup_exit
+ fi
+ 
+ echo "DUNESW loc:"
+ ups active | grep dunesw
+
+ echo "WIRECELL loc:"
+ ups active | grep wirecell
+ 
+ 
+ echo "printing env"
+ env
+ echo "DUNE specific env vars"
+ env | grep DUNE
+ 
+ echo "Will use justin-get-file"
+ DID_PFN_RSE=`$JUSTIN_PATH/justin-get-file`
+ if [ "${DID_PFN_RSE}" == "" ] ; then
+   echo "Could not get file"
+   exit 0
+ fi
+ pfn=`echo ${DID_PFN_RSE} | cut -f2 -d' '`
+ did=`echo ${DID_PFN_RSE} | cut -f1 -d' '`
+ 
+ input_filename=`echo $did | cut -f2 -d':'`
+ echo "input file: $input_filename"
+
+ echo "jobsub_id: ${JUSTIN_JOBSUB_ID:-1}"
+ 
+ echo "Getting run subrun from $did"
+ run_subrun=`python -m beam_job_utils get_run_subrun -i $did`
+ get_run_ret=$?
+ if [ $get_run_ret -ne 0 ]; then
+   echo "error in get_run_subrun"
+ fi
+ 
+ echo $run_subrun
+ run=`echo $run_subrun | cut -f1 -d' '`
+ subrun=`echo $run_subrun | cut -f2 -d' '`
+ 
+ nevents=${NEVENTS:--1} #Set from env override or -1 
+ NSKIP=${NSKIP:-0} 
+ echo "nevents: $nevents"
+ 
+ # Run Generator
+ echo "Running prod"
+ lar -c ${FCL_FILE} \
+     -o ${prodname}.root \
+     -e $run:$subrun:1 \
+     -n ${nevents} \
+     --nskip ${NSKIP} \
+     $pfn >prod.log 2>&1
+ prodExit=$?
+ 
+ if [ $prodExit -ne 0 ]; then
+   echo "Error in prod"
+   tail -100 prod.log
+   exit $prodExit
+ fi
+ export a=2
+# )
+# echo "a: ${a}"
+
+
+#subshell to run dunetpc
+# Stage 1 G4
+#(
+
+#  #Setup recent lar software suite
+#  DUNETPC_VERSION=${DUNETPC_VERSION:-v09_17_01}
+#  setup dunetpc \
+#     "${DUNETPC_VERSION}" \
+#     -q "${DUNE_QUALIFIER:-e19:prof}"
+ 
+#  setup_exit=$?
+#  if [ $? -ne 0 ]; then
+#    echo "Failed to setup tpc $DUNETPC_VERSION $DUNE_QUALIFIER"
+#    exit $setup_exit
+#  fi
+ 
+#  echo "DUNETPC loc:"
+#  ups active | grep dunetpc
+ 
+
+
+echo "Running g4"
+g4_stage1_name="${prodname}_g4_stage1"
+g4start=`date +"%s"`.0
+lar -c protoDUNE_refactored_g4_stage1.fcl \
+   ${prodname}.root \
+   -o ${g4_stage1_name}.root >g4.log 2>&1
+g4Exit=$?
+if [ $g4Exit -ne 0 ]; then
+ echo "Error in g4"
+ tail -100 g4.log
+ exit $g4Exit
+fi
+g4end=`date +"%s"`.0
+
+echo "Running g4 stage2"
+g4_stage2_name="${g4_stage1_name}_stage2"
+g4start=`date +"%s"`.0
+lar -c protoDUNE_refactored_g4_stage2_sce_datadriven.fcl \
+   ${g4_stage1_name}.root \
+   -o ${g4_stage2_name}.root >g4.log 2>&1
+g4Exit=$?
+if [ $g4Exit -ne 0 ]; then
+ echo "Error in g4"
+ tail -100 g4.log
+ exit $g4Exit
+fi
+g4end=`date +"%s"`.0
+
+ # Detsim
+ echo "Running detsim"
+ detsim_name="${g4_stage2_name}_detsim_stage1"
+ lar -c  protoDUNE_refactored_detsim_stage1.fcl  \
+     ${g4_stage2_name}.root \
+     -o ${detsim_name}.root  >detsim.log 2>&1
+ detsimExit=$?
+ if [ $detsimExit -ne 0 ]; then
+   echo "Error in detsim"
+   tail -100 detsim.log
+   exit $detsimExit
+ fi
+
+echo "Detsim memory:"
+grep MemReport detsim.log
+
+  # Detsim
+ echo "Running detsim2"
+ detsim2_name="${detsim_name}_stage2"
+ lar -c  protoDUNE_refactored_detsim_stage2.fcl  \
+     ${detsim_name}.root \
+     -o ${detsim2_name}.root  >detsim2.log 2>&1
+ detsimExit=$?
+ if [ $detsimExit -ne 0 ]; then
+   echo "Error in detsim2"
+   tail -100 detsim2.log
+   exit $detsimExit
+ fi
+
+lar -c eventdump.fcl ${detsim2_name}.root
+evdumpExit=$?
+if [ $evdumpExit -ne 0 ]; then
+  echo "Error in evdump"
+  exit $evdumpExit
+fi
+#  
+ # Reco
+ echo "Running reco"
+ reco_name="${detsim2_name}_reco"
+ recostart=`date +"%s"`.0
+ lar -c  protoDUNE_refactored_reco_35ms_sce_datadriven_stage1.fcl  \
+     ${detsim2_name}.root \
+     -o ${reco_name}.root >reco.log 2>&1
+ recoExit=$?
+ if [ $recoExit -ne 0 ]; then
+   echo "Error in reco"
+   tail -100 reco.log
+   exit $recoExit
+ fi
+ recoend=`date +"%s"`.0
+#  
+ # Make metadata
+ #  dune_mc.h4_input_file=${input_filename} \
+ overrides="core.data_tier=full-reconstructed \
+  core.application.version=${DUNESW_VERSION} \
+  dune.config_file=protoDUNE_refactored_reco_35ms_sce_datadriven_stage1.fcl \
+  dune_mc.gen_fcl_filename=${FCL_FILE} \
+  core.start_time=${recostart} \
+  core.end_time=${recoend} \
+  core.application.name=reco \
+  core.application.family=dunesw \
+  core.application=dunesw.reco \
+ "
+#  
+  namespace=${JUSTIN_SCOPE:-"usertests"}
+#  
+#  #-- ${filenum} \
+# --past_vers $DUNESW_VERSION $DUNETPC_VERSION $DUNETPC_VERSION \
+ python -m beam_job_utils make_metadata \
+        --json ${UTIL_TAR}/pdsp_beam_base_meta.json \
+        --overrides ${overrides} \
+        --event ${NSKIP} \
+        --nevents ${nevents} \
+        --run $run \
+        --subrun $subrun \
+        --past_fcls ${FCL_FILE} \
+                    protoDUNE_refactored_g4_stage1.fcl \
+                    protoDUNE_refactored_g4_stage2_sce_datadriven.fcl \
+                    protoDUNE_refactored_detsim_stage1.fcl \
+                    protoDUNE_refactored_detsim_stage2.fcl \
+        --past_apps gen g4_stage1 g4_stage2 detsim_stage1 detsim_stage2 \
+        -o ${reco_name}.root.json
+ 
+ 
+ if [ $? -ne 0 ]; then
+   echo "Error writing reco json"
+   exit 1
+ fi
+#
+#  ## TODO -- CHECK WITH LEIGH IF WE NEED EVERY PNDR FILE
+#  mv Pandora_Events.pndr ${reco_name}_Pandora_Events.pndr
+#  if [ $? -ne 0 ]; then
+#    echo "Error mving/renaming pndr file"
+#    exit 1
+#  fi
+#
+#  ## Write-out PNDR metadata
+#  ## Copy from reco json but change data tier and file format
+#  overrides="core.data_tier=pandora_info \
+#   core.file_format=binary \
+#  "
+#  python ${INPUT_DIR}/pdhd_meta_writer.py \
+#         --json ${reco_name}.root.json \
+#         --overrides ${overrides} \
+#         --filenum ${filenum} \
+#         --event ${eventnum} \
+#         --nevents ${nevents} \
+#         --jobid ${JUSTIN_JOBSUB_ID} \
+#         -o ${reco_name}_Pandora_Events.pndr.json
+#
+#  echo "All logs:"
+#  echo "-----------G4 STAGE2------------"
+#  cat g4stage2.log
+#  echo "--------------------------------"
+#  echo "-----------DETSIM---------------"
+#  cat detsim.log
+#  echo "--------------------------------"
+#  echo "-----------RECO-----------------"
+#  cat reco.log
+#  echo "--------------------------------"
+# )
+
+echo "$pfn" > justin-processed-pfns.txt
