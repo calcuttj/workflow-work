@@ -10,27 +10,27 @@ job_stages:
     fcl: pdsp_0.5GeV_h4input_cosmics.fcl
     nevents: 10
     
-  g4_stage1:
-    fcl: protoDUNE_refactored_g4_stage1.fcl
-    nevents: -1
-    art_out: True
-    tfile_out: False
-  g4_stage2:
-    fcl: protoDUNE_refactored_g4_stage2_sce_datadriven.fcl
-    nevents: -1
-    art_out: True
-    tfile_out: False
-  detsim_stage1:
-    fcl: protoDUNE_refactored_detsim_stage1.fcl
-    nevents: -1
-    art_out: True
-    tfile_out: False
-  detsim_stage2:
-    fcl: protoDUNE_refactored_detsim_stage2.fcl
-    nevents: -1
-    art_out: True
-  reco:
-    fcl: protoDUNE_refactored_reco_35ms_sce_datadriven_stage1.fcl
-    nevents: -1
-    art_out: True
-    tfile_out: False #TODO -- True
+  #g4_stage1:
+  #  fcl: protoDUNE_refactored_g4_stage1.fcl
+  #  nevents: -1
+  #  art_out: True
+  #  tfile_out: False
+  #g4_stage2:
+  #  fcl: protoDUNE_refactored_g4_stage2_sce_datadriven.fcl
+  #  nevents: -1
+  #  art_out: True
+  #  tfile_out: False
+  #detsim_stage1:
+  #  fcl: protoDUNE_refactored_detsim_stage1.fcl
+  #  nevents: -1
+  #  art_out: True
+  #  tfile_out: False
+  #detsim_stage2:
+  #  fcl: protoDUNE_refactored_detsim_stage2.fcl
+  #  nevents: -1
+  #  art_out: True
+  #reco:
+  #  fcl: protoDUNE_refactored_reco_35ms_sce_datadriven_stage1.fcl
+  #  nevents: -1
+  #  art_out: True
+  #  tfile_out: False #TODO -- True

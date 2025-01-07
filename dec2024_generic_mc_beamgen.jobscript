@@ -35,7 +35,8 @@ echo "Justin specific env vars"
 env | grep JUSTIN
 now=$(date -u +"%Y%m%dT%H%M%SZ")
 jobid=`echo "${JUSTIN_JOBSUB_ID:-1}" | cut -f1 -d'@' | sed -e "s/\./_/"`
-export prodname="prod_beam_p0.5GeV_protodunesp_${JUSTIN_STAGE_ID}_${jobid}_${now}" #TODO -- make this more general
+stageid=${JUSTIN_STAGE_ID:-1}
+#export prodname="prod_beam_p0.5GeV_protodunesp_${stageid}_${jobid}_${now}" #TODO -- make this more general
 a=1
 ##Subhell to run dunesw
 # (
@@ -62,7 +63,7 @@ a=1
  fi
 
  #Setup recent lar software suite
- DUNESW_VERSION=${DUNESW_VERSION:-v10_01_03d00}
+ DUNESW_VERSION=${DUNESW_VERSION:-v10_02_02d00}
  setup dunesw \
     "${DUNESW_VERSION}" \
     -q "${DUNE_QUALIFIER:-e26:prof}"
@@ -109,17 +110,21 @@ fi
 
  echo "jobsub_id: ${JUSTIN_JOBSUB_ID:-1}"
  
- echo "Getting run subrun from $did"
- run_subrun=`python -m beam_job_utils get_run_subrun -i $did`
- get_run_ret=$?
- if [ $get_run_ret -ne 0 ]; then
-   echo "error in get_run_subrun"
+ if [ -z "$MCJob" ]; then
+   echo "Getting run subrun from $did"
+   run_subrun=`python -m beam_job_utils get_run_subrun -i $did`
+   get_run_ret=$?
+   if [ $get_run_ret -ne 0 ]; then
+     echo "error in get_run_subrun"
+   fi
+ 
+   echo $run_subrun
+   run=`echo $run_subrun | cut -f1 -d' '`
+   subrun=`echo $run_subrun | cut -f2 -d' '`
+ else
+   run=`echo $jobid | cut -f1 -d'_'`  ##TODO -- check order here
+   subrun=`echo $jobid | cut -f2 -d'_'`
  fi
- 
- echo $run_subrun
- run=`echo $run_subrun | cut -f1 -d' '`
- subrun=`echo $run_subrun | cut -f2 -d' '`
- 
  nevents=${NEVENTS:--1} #Set from env override or -1 
  NSKIP=${NSKIP:-0} 
  echo "nevents: $nevents"
@@ -269,13 +274,23 @@ fi
   core.application=dunesw.reco \
  "
 
+if [ -n "$MCJob" ]; then
+  inputflag=""
+else
+  inputflag="-i $pfn --parent $did"
+fi
+
+echo "input flag: $inputflag"
+
 python -m beam_job_utils run_job \
       --json ${UTIL_TAR}/pdsp_beam_base_meta.json \
       --overrides ${overrides} \
       --run $run \
       --subrun $subrun \
-      --yaml ${UTIL_TAR}/pdsp_beam_gen.yaml \
-      -i $pfn #For cosmics/radio only mc -- need to not take in an input file 
+      --yaml ${UTIL_TAR}/${YAMLFILE:-pdsp_beam_gen.yaml} \
+      --nevents $nevents \
+      $inputflag
+      #-i $pfn #For cosmics/radio only mc -- need to not take in an input file 
 
 exitcode=$?
 if [ $exitcode -ne 0 ]; then

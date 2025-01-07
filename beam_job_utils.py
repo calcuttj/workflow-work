@@ -26,7 +26,7 @@ class FakeArgs:
     self.past_vers = None
     self.o = outname
     self.exclude = args.exclude
-    self.parent=None
+    self.parent=args.parent
 #  overrides="
 #  "
 
@@ -37,7 +37,7 @@ class FakeArgs:
 
 def check_args_md(args):
   for arg in [args.nevents, args.run, args.subrun]:
-    if args is None:
+    if arg is None:
       print('Need to provide nevents, run, and subrun for metadata')
       exit(1)
 
@@ -135,7 +135,12 @@ def make_metadata(args):
 
 def run_stage(stage, fcl, input_file, nevents, artroot_out=None, tfile_out=None, do_timing=False):
   print('Running', stage)
-  cmd = ['lar', '-c', fcl, input_file, '-n', str(nevents),]
+  cmd = ['lar', '-c', fcl]
+
+  if input_file is not None: cmd.append(input_file)
+
+  cmd += ['-n', str(nevents),]
+
   if artroot_out is not None:
     cmd += ['-o', artroot_out]
   if tfile_out is not None:
@@ -191,6 +196,9 @@ def run_job(args):
   for i, (stagename, stage) in enumerate(stages.items()):
     print(stagename)
     
+    if i == 0 and args.nevents is not None:
+      stage['nevents'] = args.nevents
+
     if i > 0:
       art_out = art_out.replace('.root', f'_{stagename}.root')
     
