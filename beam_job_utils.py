@@ -1,7 +1,39 @@
 from metacat.webapi import MetaCatClient
 from argparse import ArgumentParser as ap
+import sys
+
 import json
+import subprocess
+import os
 mc = MetaCatClient()
+
+class FakeArgs:
+  def __init__(self, args, outname, start_time, end_time, gen_fcl, end_fcl):
+    self.overrides = ([] if args.overrides is None else args.overrides) + [
+      f'dune.config_file={end_fcl}',      
+      f'core.start_time={start_time}',
+      f'core.end_time={end_time}',
+    ]
+    if gen_fcl is not None:
+      self.overrides.append(f'dune_mc.gen_fcl_filename={gen_fcl}')
+    self.json = args.json
+    self.event = args.event
+    self.nevents = args.nevents
+    self.run = args.run
+    self.subrun = args.subrun
+    self.past_fcls = []
+    self.past_apps = []
+    self.past_vers = None
+    self.o = outname
+    self.exclude = args.exclude
+    self.parent=None
+#  overrides="
+#  "
+
+# class Results:
+#   def __init__(self, success, timing=None):
+#     self.success = success
+#     self.timing = timing
 
 def check_args_md(args):
   for arg in [args.nevents, args.run, args.subrun]:
@@ -101,16 +133,106 @@ def make_metadata(args):
   with open(args.o, "w") as outfile:
     outfile.write(json_object)
 
+def run_stage(stage, fcl, input_file, nevents, artroot_out=None, tfile_out=None, do_timing=False):
+  print('Running', stage)
+  cmd = ['lar', '-c', fcl, input_file, '-n', str(nevents),]
+  if artroot_out is not None:
+    cmd += ['-o', artroot_out]
+  if tfile_out is not None:
+    cmd += ['-T', tfile_out]
+  
+  if do_timing:
+    import time
+    start_time = time.time()
+  print(cmd)
+  proc = subprocess.run(
+    cmd#, capture_output=True
+  )
+  if do_timing:
+    end_time = time.time()
+
+  if proc.returncode != 0:
+    print('Error in processing', stage)
+    sys.exit(proc.returncode)
+  
+  results = {
+    'art_out':artroot_out
+  }
+  if do_timing:
+    results['start_time'] = start_time
+    results['end_time'] = end_time
+  return results
+
+def build_name(config):
+  #TODO add timestamp
+  base = config['art_out_base']
+  if config['justin_stage_outname']:
+    base += f'_{os.getenv("JUSTIN_STAGE_ID", "1")}'
+  if config['justin_jobid_outname']:
+    jobid = os.getenv("JUSTIN_JOBSUB_ID", '1').split('@')[0].replace('.', '_')
+    base += f'_{jobid}'
+  base += '.root'
+  return base
+
+def run_job(args):
+  import yaml
+  with open(args.yaml) as fin:
+    config = yaml.safe_load(fin)
+
+  time_last = config['time_last']
+  # pass_name = config['pass_name_through_stages']
+  art_out = build_name(config)
+
+  stages = config['job_stages']
+  n_stages = len(stages)
+  input = args.i
+  past_fcls = []
+  past_apps = []
+  for i, (stagename, stage) in enumerate(stages.items()):
+    print(stagename)
+    
+    if i > 0:
+      art_out = art_out.replace('.root', f'_{stagename}.root')
+    
+    if i != (n_stages-1):
+      past_fcls.append(stage['fcl'])
+      past_apps.append(stagename)
+
+    do_timing = time_last and (i == (n_stages-1))
+    result = run_stage(stagename, stage['fcl'], input, stage['nevents'], artroot_out=art_out,
+                       do_timing=do_timing)
+    print(result)
+    input = art_out
+    end_fcl = stage['fcl']
+
+  #Get metadata
+  gen_fcl = None if 'gen' not in stages else stages['gen']['fcl']
+  md_args = FakeArgs(args, f'{art_out}.json', result['start_time'], result['start_time'], gen_fcl, end_fcl)
+  md_args.past_fcls = past_fcls
+  md_args.past_apps = past_apps
+  md_args.nevents = get_artroot_nevents(art_out)
+  make_metadata(md_args)
+
+def get_artroot_nevents(filename):
+  import ROOT as RT
+  f = RT.TFile.Open(filename)
+  t = f.Get('Events')
+  nevents = t.GetEntries()
+  f.Close()
+  return nevents
+
+
 
 if __name__ == '__main__':
   parser = ap()
   parser.add_argument(
     'routine',
     type=str,
-    choices=['get_run_subrun', 'make_metadata'],
+    choices=['get_run_subrun', 'make_metadata', 'run_job'],
   )
 
   parser.add_argument('-i', type=str, default=None)
+  parser.add_argument('--yaml', type=str, default=None)
   parser.add_argument('-o', type=str, default=None)
   parser.add_argument('--json', type=str, default=None)
   parser.add_argument('--run', type=int, default=None,)
@@ -129,6 +251,8 @@ if __name__ == '__main__':
   routines = {
     'get_run_subrun':get_run_subrun,
     'make_metadata':make_metadata,
+    'run_job':run_job,
+    'get_artroot_nevents':get_artroot_nevents,
   }
 
   routines[args.routine](args)

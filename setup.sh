@@ -3,7 +3,7 @@
 setup metacat
 setup justin
 setup rucio
-setup python v3_9_13
+setup python v3_9_15
 #setup dunesw v09_81_00d02 -q e26:prof
 
 export METACAT_SERVER_URL=https://metacat.fnal.gov:9443/dune_meta_prod/app

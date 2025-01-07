@@ -34,6 +34,17 @@ if [ -n "$PROTODUNEANA_TAR" ]; then
   echo "Set protoduneana to $PROTODUNEANA_TAR"
 fi
 
+if [ -n "$GEANT4REWEIGHT_TAR" ]; then
+  stat ${GEANT4REWEIGHT_TAR}
+  if [ $? -ne 0 ]; then
+    echo "Failed to stat $GEANT4REWEIGHT_TAR. Exiting safely"
+    exit 0
+  fi
+
+  export PRODUCTS=$GEANT4REWEIGHT_TAR:$PRODUCTS 
+  echo "Set protoduneana to $GEANT4REWEIGHT_TAR"
+fi
+
 
 #Setup recent lar software suite
 DUNE_VERSION=${DUNE_VERSION:-v09_81_00d01}
@@ -103,7 +114,8 @@ now=$(date -u +"%Y%m%dT%H%M%SZ")
 ##TODO -- edit this
 #jobid=`echo "${JUSTIN_JOBSUB_ID:-1}" | awk -F '.' '{print $1}'`
 jobid=`echo "${JUSTIN_JOBSUB_ID:-1}" | cut -f1 -d'@' | sed -e "s/\./_/"`
-OUTFILE="pdspana_${jobid}_${JUSTIN_STAGE_ID}_${JUSTIN_WORKFLOW_ID}_${now}.root"
+PREFIX=${PREFIX:-"pdspana"}
+OUTFILE="${PREFIX}_${jobid}_${JUSTIN_STAGE_ID}_${JUSTIN_WORKFLOW_ID}_${now}.root"
 
 
 nevents=${NEVENTS:--1}
@@ -135,8 +147,8 @@ python $NTUPLE_DIR/ntuple_prod_utils.py \
   --dids input_dids.list \
   --version ${DUNE_VERSION} \
   --fcl_name ${FCL_FILE} \
-  --log_file md.log \
   -o $OUTFILE.json
+  #--log_file md.log \
 mdExit=$?
 if [ $mdExit -ne 0 ]; then
   echo "Error in ntuple metdata production"

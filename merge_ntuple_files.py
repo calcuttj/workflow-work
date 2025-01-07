@@ -98,7 +98,10 @@ def split_metadata(args):
       'parents':[],
       'name':f'{args.o}{j}.root',
       'namespace':args.namespace,
-      'metadata':{'core.data_tier':'root-tuple'},
+      'metadata':{
+        'core.data_tier':'root-tuple',
+        'dune.dataset_name':f'{args.namespace}:{args.namespace}_{args.dataset}',
+      },
     }
   
     files = mc.get_files(mc_did_list)
@@ -302,6 +305,7 @@ if __name__ == '__main__':
   parser.add_argument('-n', type=int, default=-1)
   parser.add_argument('-o', type=str, help='Output name')
   parser.add_argument('--namespace', type=str, required=True, help='Which namespace')
+  parser.add_argument('--dataset', type=str, help='Dataset to inject to metadata')
   args = parser.parse_args()
 
 
