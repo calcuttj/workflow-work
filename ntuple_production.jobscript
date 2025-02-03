@@ -147,6 +147,7 @@ python $NTUPLE_DIR/ntuple_prod_utils.py \
   --dids input_dids.list \
   --version ${DUNE_VERSION} \
   --fcl_name ${FCL_FILE} \
+  --tree_name ${TREE_NAME:-"beamana/pduneana"} \
   -o $OUTFILE.json
   #--log_file md.log \
 mdExit=$?

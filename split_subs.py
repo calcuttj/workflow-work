@@ -72,11 +72,11 @@ def submit(args):
                                f'-Oglobal.run={run}',
                                f'-Oglobal.n={persplit}',
                                f'-Oglobal.input_file={f}',
-                               f'-Ogloabl.stream={args.stream}'
+                               f'-Oglobal.stream={args.stream}'
             ]
 
             if args.verbose or args.dry_run:
-                print(cmd)
+                print(' '.join(cmd))
             if not args.dry_run:
                 proc = subprocess.run(cmd, capture_output=True)
 

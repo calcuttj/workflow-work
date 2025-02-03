@@ -2,11 +2,6 @@
 #
 
 #These must be defined
-if [ -z $FCL_FILE ]; then
-  echo "Fatal Must provide FCL_FILE env var"
-  exit 1
-fi
-
 if [ -z $UTIL_TAR ]; then
   echo "Fatal must provide UTIL_TAR env var"
   exit 1
@@ -146,12 +141,13 @@ echo "input flag: $inputflag"
 
 # TODO -- metadata file configurable
 python -m beam_job_utils run_job \
-      --json ${UTIL_TAR}/pdsp_beam_base_meta.json \
+      --json ${UTIL_TAR}/${JSONFILE:-pdsp_beam_base_meta.json} \
       --overrides ${overrides} \
       --run $run \
       --subrun $subrun \
       --yaml ${UTIL_TAR}/${YAMLFILE:-pdsp_beam_gen.yaml} \
       --nevents $nevents \
+      --event $NSKIP \
       $inputflag
 
 exitcode=$?
@@ -161,3 +157,4 @@ if [ $exitcode -ne 0 ]; then
 fi
 
 echo "$pfn" > justin-processed-pfns.txt
+

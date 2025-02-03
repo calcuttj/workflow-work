@@ -1,6 +1,7 @@
 from metacat.webapi import MetaCatClient
 from argparse import ArgumentParser as ap
 import sys
+import time
 
 import json
 import subprocess
@@ -85,11 +86,12 @@ def make_metadata(args):
     ]
 
   in_dict['metadata']['core.event_count'] = args.nevents
-  in_dict['metadata']['core.runs'] = [args.run]
-  in_dict['metadata']['core.runs_subruns'] = [args.subrun]
-  in_dict['metadata']['core.first_event_number'] = args.event
-  in_dict['metadata']['core.last_event_number'] = (
-      args.event + args.nevents - 1)
+  if args.nevents > 0:
+    in_dict['metadata']['core.runs'] = [args.run]
+    in_dict['metadata']['core.runs_subruns'] = [args.subrun]
+    in_dict['metadata']['core.first_event_number'] = args.event
+    in_dict['metadata']['core.last_event_number'] = (
+        args.event + args.nevents - 1)
 
   if args.past_fcls is not None:
     if ((args.past_apps is None) or (len(args.past_fcls) != len(args.past_apps))
@@ -133,93 +135,194 @@ def make_metadata(args):
   with open(args.o, "w") as outfile:
     outfile.write(json_object)
 
-def run_stage(stage, fcl, input_file, nevents, artroot_out=None, tfile_out=None, do_timing=False):
+def run_stage(stage, fcl, input_file, nevents, event, outname, artroot_out=False, tfile_out=False, do_timing=False):
   print('Running', stage)
   cmd = ['lar', '-c', fcl]
 
   if input_file is not None: cmd.append(input_file)
 
   cmd += ['-n', str(nevents),]
+  cmd += ['--nskip', str(event),]
 
-  if artroot_out is not None:
-    cmd += ['-o', artroot_out]
-  if tfile_out is not None:
-    cmd += ['-T', tfile_out]
+  if artroot_out:
+    cmd += ['-o', outname]
+  if tfile_out:
+    tfile_outname = outname.replace('.root', '_tfile.root')
+    cmd += ['-T', tfile_outname]
   
-  if do_timing:
-    import time
+  if do_timing:    
     start_time = time.time()
   print(cmd)
   proc = subprocess.run(
-    cmd#, capture_output=True
+    cmd, capture_output=True
   )
   if do_timing:
     end_time = time.time()
 
+  print('Stdout:')
+  print(proc.stdout.decode('utf-8'))
+  print('Stderr:')
+  print(proc.stderr.decode('utf-8'))
+  
   if proc.returncode != 0:
     print('Error in processing', stage)
+    print(proc.stderr.decode('utf-8'))
     sys.exit(proc.returncode)
   
+  
+
+  with open(outname.replace('.root', '.log'), 'w') as f:
+    f.write(proc.stdout.decode('utf-8'))
+  with open(outname.replace('.root', '.err'), 'w') as f:
+    f.write(proc.stderr.decode('utf-8'))
+
   results = {
-    'art_out':artroot_out
+    'art_out':outname
   }
+  if tfile_out:
+    results['tfile_out'] = tfile_outname
   if do_timing:
     results['start_time'] = start_time
     results['end_time'] = end_time
   return results
 
-def build_name(config):
-  #TODO add timestamp
-  base = config['art_out_base']
+def build_name(config, inputname=None):
+
+  #TODO -- check inputname not none 
+  base = (
+    inputname.split('/')[-1].replace('.root', '').replace('.hdf5', '')
+    if config['inherit_name']
+    else config['art_out_base']
+  )
+
   if config['justin_stage_outname']:
     base += f'_{os.getenv("JUSTIN_STAGE_ID", "1")}'
   if config['justin_jobid_outname']:
     jobid = os.getenv("JUSTIN_JOBSUB_ID", '1').split('@')[0].replace('.', '_')
     base += f'_{jobid}'
+  if config['timestamp_outname']:
+    base += f'_{int(time.time())}'
   base += '.root'
   return base
 
+def build_config(config):
+  defaults = {
+    'time_last': False,
+    'pass_name_through_stages': False,
+    'timestamp_outname': False,
+    'justin_stage_outname': False,
+    'justin_jobid_outname': False,
+    'inherit_name': False,
+  }
+  to_check = [
+    'art_out_base',
+  ]
+
+  stage_defaults = {
+    'art_out': False,
+    'tfile_out': False,
+    'make_art_metadata': False,
+    'make_tfile_metadata': False,
+    'nevents':-1, #DO we want this?
+  }
+  stage_to_check = [
+    'fcl',
+  ]
+  
+  for tc in to_check:
+    if tc not in config:
+      raise Exception(f'Error, need to provide {tc} in top level of yaml file')
+  for key, val in defaults.items():
+      if key not in config:
+        config[key] = val
+
+  for i, (stagename, stage) in enumerate(config['job_stages'].items()):
+    for tc in stage_to_check:
+      if tc not in stage:
+        raise Exception(f'Error, need to provide {tc} in stage {stagename}')
+    
+    for key, val in stage_defaults.items():
+      if key not in stage:
+        stage[key] = val
+
+    
 def run_job(args):
   import yaml
   with open(args.yaml) as fin:
     config = yaml.safe_load(fin)
+  build_config(config)
 
   time_last = config['time_last']
-  # pass_name = config['pass_name_through_stages']
-  art_out = build_name(config)
+  #pass_name = config['pass_name_through_stages']
+  
 
   stages = config['job_stages']
   n_stages = len(stages)
   input = args.i
+  outname = build_name(config, args.i)
   past_fcls = []
   past_apps = []
+  
+  art_outputs = {}
   for i, (stagename, stage) in enumerate(stages.items()):
     print(stagename)
-    
+
     if i == 0 and args.nevents is not None:
       stage['nevents'] = args.nevents
 
-    if i > 0:
-      art_out = art_out.replace('.root', f'_{stagename}.root')
-    
+    if i == 0:
+      stage['event'] = args.event
+    else: stage['event'] = 0
+
+    make_art_output = stage['art_out']
+    make_tfile_output = stage['tfile_out']
+
+    # if i > 0:
+    outname = outname.replace('.root', f'_{stagename}.root')
+
     if i != (n_stages-1):
       past_fcls.append(stage['fcl'])
       past_apps.append(stagename)
 
     do_timing = time_last and (i == (n_stages-1))
-    result = run_stage(stagename, stage['fcl'], input, stage['nevents'], artroot_out=art_out,
-                       do_timing=do_timing)
+    
+    #TODO -- check args.i/input_from consistency
+    input_from = stage['input_from']
+    if input_from is None:
+      input = None
+    elif input_from != 'job':
+      input = art_outputs[input_from]
+    else:
+      input = args.i
+    result = run_stage(stagename, stage['fcl'], input,
+                       stage['nevents'], stage['event'],
+                       outname,
+                       artroot_out=make_art_output,
+                       do_timing=do_timing, tfile_out=make_tfile_output)
     print(result)
-    input = art_out
+    input = outname
     end_fcl = stage['fcl']
+    art_outputs[stagename] = result['art_out']
+
+    if make_art_output and stage['make_art_metadata']:
+      gen_fcl = None if 'gen' not in stages else stages['gen']['fcl']
+      md_args = FakeArgs(args, f'{outname}.json', result['start_time'], result['end_time'], gen_fcl, end_fcl)
+      md_args.past_fcls = past_fcls
+      md_args.past_apps = past_apps
+      md_args.nevents = get_artroot_nevents(outname)
+      make_metadata(md_args)
+    #TODO -- make tfile metadata configurable
 
   #Get metadata
-  gen_fcl = None if 'gen' not in stages else stages['gen']['fcl']
-  md_args = FakeArgs(args, f'{art_out}.json', result['start_time'], result['start_time'], gen_fcl, end_fcl)
-  md_args.past_fcls = past_fcls
-  md_args.past_apps = past_apps
-  md_args.nevents = get_artroot_nevents(art_out)
-  make_metadata(md_args)
+  # Check the last stage if we're supposed store metadata -- TODO make this per stage
+  # make_metadata = stage[]
+  # if do_make_metadata:
+  #   gen_fcl = None if 'gen' not in stages else stages['gen']['fcl']
+  #   md_args = FakeArgs(args, f'{outname}.json', result['start_time'], result['end_time'], gen_fcl, end_fcl)
+  #   md_args.past_fcls = past_fcls
+  #   md_args.past_apps = past_apps
+  #   md_args.nevents = get_artroot_nevents(outname)
+  #   make_metadata(md_args)
 
 def get_artroot_nevents(filename):
   import ROOT as RT
@@ -229,14 +332,14 @@ def get_artroot_nevents(filename):
   f.Close()
   return nevents
 
-
-
+def get_artroot_nevents_routine(args):
+  print(get_artroot_nevents(args.i))
 if __name__ == '__main__':
   parser = ap()
   parser.add_argument(
     'routine',
     type=str,
-    choices=['get_run_subrun', 'make_metadata', 'run_job'],
+    choices=['get_run_subrun', 'make_metadata', 'run_job', 'get_artroot_nevents'],
   )
 
   parser.add_argument('-i', type=str, default=None)
@@ -260,7 +363,7 @@ if __name__ == '__main__':
     'get_run_subrun':get_run_subrun,
     'make_metadata':make_metadata,
     'run_job':run_job,
-    'get_artroot_nevents':get_artroot_nevents,
+    'get_artroot_nevents':get_artroot_nevents_routine,
   }
 
   routines[args.routine](args)

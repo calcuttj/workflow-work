@@ -10,26 +10,32 @@ job_stages:
   gen:
     fcl: prod_cosmics_radiologicals_protodunehd.fcl 
     nevents: 10
-    
-  g4_stage1:
-    fcl: standard_g4_protodunehd_stage1.fcl
-    nevents: -1
-    
     art_out: True
     tfile_out: False
-  g4_stage2:
-    fcl: standard_g4_protodunehd_stage1.fcl
+
+    input_from: "job" ##Todo -- make sure input is passed through
+  g4:
+    fcl: standard_g4_protodunehd_nophoton.fcl
     nevents: -1
     art_out: True
     tfile_out: False
+    input_from: "gen"
   detsim:
-    fcl: standard_detsim_protodunehd
+    fcl: standard_detsim_protodunehd_nophoton.fcl
     nevents: -1
     art_out: True
     tfile_out: False
-  reco:
-    fcl: standard_reco_protodunehd.fcl
+    input_from: "g4"
+  reco_stage1:
+    fcl: standard_reco_stage1_protodunehd_MC.fcl 
     nevents: -1
     art_out: True
     tfile_out: False #TODO -- True
-    
+    input_from: "detsim"
+  reco_stage2:
+    fcl: standard_reco_stage2_protodunehd_MC_nophoton.fcl 
+    nevents: -1
+    art_out: True
+    make_art_metadata: True
+    tfile_out: False
+    input_from: "reco_stage1"

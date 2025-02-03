@@ -181,7 +181,7 @@ def get_metadata(args):
   ##Get Nevents from root file
   ##Might need to make configurable i.e. tree name
   fIn = RT.TFile.Open(args.root_file)
-  tree = fIn.Get('pduneana/beamana')
+  tree = fIn.Get(args.tree_name)
   nevents = tree.GetEntries()
   output_md['core.event_count'] = nevents
   
@@ -246,6 +246,7 @@ if __name__ == '__main__':
   parser.add_argument('--log_file', type=str, help='Log file for metadata',
                       default=None)
   parser.add_argument('--parent_metas', type=str, nargs='+')
+  parser.add_argument('--tree_name', type=str, default='pduneana/beamana')
   args = parser.parse_args()
 
   commands = {
