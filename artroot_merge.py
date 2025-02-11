@@ -228,7 +228,7 @@ def do_merge(fids, fcl, outname, skip_checksum=False):
     proc = subprocess.run(cmd, capture_output=True)
     if proc.returncode != 0:
         raise Exception('ERROR MERING', proc.returncode, proc.stderr)
-    
+    merged_md['dune.dataset_name'] = f'{namespace}:{namespace}_{outname.replace(".root", "")}'
     #Write out metadata
     final_md = {
         'metadata':merged_md,
