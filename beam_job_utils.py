@@ -161,7 +161,8 @@ def run_stage(stage, fcl, input_file, nevents, event, outname, artroot_out=False
     start_time = time.time()
   print(cmd)
   proc = subprocess.run(
-    cmd, capture_output=True
+    cmd, capture_output=True,
+    env=os.environ.copy(),
   )
   if do_timing:
     end_time = time.time()
