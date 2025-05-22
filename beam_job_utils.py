@@ -141,8 +141,6 @@ def run_stage(stage, fcl, input_file, nevents, event, outname, artroot_out=False
 
   if input_file is not None:
     cmd.append(input_file)
-    if '.hdf5' in input_file:
-      cmd = ['LD_PRELOAD=$XROOTD_LIB/libXrdPosixPreload.so'] + cmd
 
   cmd += ['-n', str(nevents),]
   if event is not None and not args.set_esr:
