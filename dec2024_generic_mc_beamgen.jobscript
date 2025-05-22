@@ -137,10 +137,15 @@ else
   inputflag="-i $pfn --parent $did"
 fi
 
+if [[ $ == *.hdf5 ]]; then
+  pre_flag="LD_PRELOAD=$XROOTD_LIB/libXrdPosixPreload.so "
+else
+  pre_flag=""
+
 echo "input flag: $inputflag"
 
 # TODO -- metadata file configurable
-python -m beam_job_utils run_job \
+$pre_flag python -m beam_job_utils run_job \
       --json ${UTIL_TAR}/${JSONFILE:-pdsp_beam_base_meta.json} \
       --overrides ${overrides} \
       --run $run \
