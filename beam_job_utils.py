@@ -142,7 +142,13 @@ def run_stage(stage, fcl, input_file, nevents, event, outname, artroot_out=False
   if input_file is not None: cmd.append(input_file)
 
   cmd += ['-n', str(nevents),]
-  cmd += ['--nskip', str(event),]
+  if event is not None and not args.set_esr:
+    cmd += ['--nskip', str(event),]
+  elif args.set_esr:
+    run = 1 if args.run is None else args.run
+    subrun = 0 if args.subrun is None else args.subrun
+    event = 1 if args.event is None else args.event
+    cmd += ['-e', f'{run}:{subrun}:{event}',]
 
   if artroot_out:
     cmd += ['-o', outname]
@@ -215,7 +221,10 @@ def build_config(config):
     'inherit_name': False,
   }
   to_check = [
-    'art_out_base',
+    #'art_out_base',
+  ]
+  either_or = [
+    ['art_out_base', 'inherit_name']
   ]
 
   stage_defaults = {
@@ -229,6 +238,8 @@ def build_config(config):
     'fcl',
   ]
   
+
+
   for tc in to_check:
     if tc not in config:
       raise Exception(f'Error, need to provide {tc} in top level of yaml file')
@@ -244,6 +255,10 @@ def build_config(config):
     for key, val in stage_defaults.items():
       if key not in stage:
         stage[key] = val
+
+    for keys in either_or:
+      any_there = False
+      for k in keys: any_there |= (k in config)
 
     
 def run_job(args):
@@ -270,9 +285,12 @@ def run_job(args):
     if i == 0 and args.nevents is not None:
       stage['nevents'] = args.nevents
 
-    if i == 0:
-      stage['event'] = args.event
-    else: stage['event'] = 0
+    if args.event is None:
+        stage['event']=None
+    else:
+      if i == 0:
+        stage['event'] = args.event
+      else: stage['event'] = 0
 
     make_art_output = stage['art_out']
     make_tfile_output = stage['tfile_out']
@@ -351,11 +369,12 @@ if __name__ == '__main__':
   parser.add_argument('--exclude', type=str, default=None, nargs='+')
   parser.add_argument('--overrides', type=str, default=None, nargs='+')
   parser.add_argument('--parent', type=str, default=None)
-  parser.add_argument('--event', type=int, default=0)
+  parser.add_argument('--event', type=int, default=None)
   parser.add_argument('--nevents', type=int, default=None)
   parser.add_argument('--past_fcls', type=str, nargs='+')
   parser.add_argument('--past_apps', type=str, nargs='+')
   parser.add_argument('--past_vers', type=str, nargs='+')
+  parser.add_argument('--set_esr', action='store_true')
 
   args = parser.parse_args()
 
