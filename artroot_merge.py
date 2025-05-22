@@ -59,7 +59,7 @@ def routine(args):
             fids = args.fids
         else:
             with open(args.fid_list, 'r') as f:
-                fids = f.readlines()[0].strip().split(':')[0].split(',')
+                fids = f.readlines()[args.n].strip().split(':')[0].split(',')
             
         do_merge(fids, args.fcl, args.o, skip_checksum=args.skip_checksum)
 

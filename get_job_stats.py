@@ -51,7 +51,7 @@ if __name__ == '__main__':
   print(query)
 
   files = [f for f in mc.query(query, with_metadata=True)]
-  print(files[0])
+  #print(files[0])
 
   times = get_times(files)
 

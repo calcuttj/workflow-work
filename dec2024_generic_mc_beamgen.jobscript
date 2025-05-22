@@ -141,6 +141,7 @@ if [[ $ == *.hdf5 ]]; then
   pre_flag="LD_PRELOAD=$XROOTD_LIB/libXrdPosixPreload.so "
 else
   pre_flag=""
+fi
 
 echo "input flag: $inputflag"
 
