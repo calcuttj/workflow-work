@@ -139,7 +139,10 @@ def run_stage(stage, fcl, input_file, nevents, event, outname, artroot_out=False
   print('Running', stage)
   cmd = ['lar', '-c', fcl]
 
-  if input_file is not None: cmd.append(input_file)
+  if input_file is not None:
+    cmd.append(input_file)
+    if '.hdf5' in input_file:
+      cmd = ['LD_PRELOAD=$XROOTD_LIB/libXrdPosixPreload.so'] + cmd
 
   cmd += ['-n', str(nevents),]
   if event is not None and not args.set_esr:
@@ -233,6 +236,7 @@ def build_config(config):
     'make_art_metadata': False,
     'make_tfile_metadata': False,
     'nevents':-1, #DO we want this?
+    'input_type':'root',
   }
   stage_to_check = [
     'fcl',
