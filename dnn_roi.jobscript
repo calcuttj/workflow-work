@@ -1,0 +1,165 @@
+#!/bin/bash
+#
+
+#These must be defined
+if [ -z $UTIL_TAR ]; then
+  echo "Fatal must provide UTIL_TAR env var"
+  exit 1
+fi
+export PYTHONPATH=$UTIL_TAR:$PYTHONPATH
+
+source /cvmfs/dune.opensciencegrid.org/products/dune/setup_dune.sh
+setup metacat
+export METACAT_SERVER_URL=https://metacat.fnal.gov:9443/dune_meta_prod/app
+export METACAT_AUTH_SERVER_URL=https://metacat.fnal.gov:8143/auth/dune
+
+if [ -z ${JUSTIN_PROCESSORS} ]; then
+  JUSTIN_PROCESSORS=1
+fi
+
+echo "Justin processors: ${JUSTIN_PROCESSORS}"
+
+export TF_NUM_THREADS=${JUSTIN_PROCESSORS}   
+export OPENBLAS_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export JULIA_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export MKL_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export NUMEXPR_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export OMP_NUM_THREADS=${JUSTIN_PROCESSORS}  
+
+echo "Justin specific env vars"
+env | grep JUSTIN
+now=$(date -u +"%Y%m%dT%H%M%SZ")
+jobid=`echo "${JUSTIN_JOBSUB_ID:-1}" | cut -f1 -d'@' | sed -e "s/\./_/"`
+stageid=${JUSTIN_STAGE_ID:-1}
+a=1
+ if [ -n "$DUNESW_TAR" ]; then
+   stat ${DUNESW_TAR}
+   if [ $? -ne 0 ]; then
+     echo "Failed to stat $DUNESW_TAR. Exiting safely"
+     exit 0
+   fi
+ 
+   export PRODUCTS=$DUNESW_TAR:$PRODUCTS 
+   echo "Set dunesw to $DUNESW_TAR"
+ fi
+
+ if [ -n "$WIRECELL_TAR" ]; then
+   stat ${WIRECELL_TAR}
+   if [ $? -ne 0 ]; then
+     echo "Failed to stat $WIRECELL_TAR. Exiting safely"
+     exit 0
+   fi
+ 
+   export PRODUCTS=$WIRECELL_TAR:$PRODUCTS 
+   echo "Set wirecell to $WIRECELL_TAR"
+ fi
+
+ #Setup recent lar software suite
+ DUNESW_VERSION=${DUNESW_VERSION:-v10_02_02d00}
+ setup dunesw \
+    "${DUNESW_VERSION}" \
+    -q "${DUNE_QUALIFIER:-e26:prof}"
+ 
+ setup_exit=$?
+ if [ $? -ne 0 ]; then
+   echo "Failed to setup dunesw $DUNESW_VERSION $DUNE_QUALIFIER"
+   exit $setup_exit
+ fi
+ 
+ echo "DUNESW loc:"
+ ups active | grep dunesw
+
+ echo "WIRECELL loc:"
+ ups active | grep wirecell
+ 
+ 
+ echo "printing env"
+ env
+ echo "DUNE specific env vars"
+ env | grep DUNE
+
+# User can specify to pip install pyyaml
+if [ -n "$pipyaml" ]; then
+  echo "Installing yaml"
+  pip install --user pyyaml
+  echo "Done"
+# elif [ -n "${YAML_TAR}" ]; then
+#   echo "Using venv at ${YAML_TAR}"
+#   source ${YAML_TAR}/yaml_venv/bin/activate
+fi
+
+
+ echo "Will use justin-get-file"
+ DID_PFN_RSE=`$JUSTIN_PATH/justin-get-file`
+ if [ "${DID_PFN_RSE}" == "" ] ; then
+   echo "Could not get file"
+   exit 0
+ fi
+ pfn=`echo ${DID_PFN_RSE} | cut -f2 -d' '`
+ did=`echo ${DID_PFN_RSE} | cut -f1 -d' '`
+ 
+ input_filename=`echo $did | cut -f2 -d':'`
+ echo "input file: $input_filename"
+
+ echo "jobsub_id: ${JUSTIN_JOBSUB_ID:-1}"
+ 
+ #Get run/subrun from parent if using input -- else from justin job ID/process"
+ if [ -z "$MCJob" ]; then
+   echo "Getting run subrun from $did"
+   run_subrun=`python -m beam_job_utils get_run_subrun -i $did`
+   get_run_ret=$?
+   if [ $get_run_ret -ne 0 ]; then
+     echo "error in get_run_subrun"
+   fi
+ 
+   echo $run_subrun
+   run=`echo $run_subrun | cut -f1 -d' '`
+   subrun=`echo $run_subrun | cut -f2 -d' '`
+ else
+   run=`echo $jobid | cut -f1 -d'_'`  ##TODO -- check order here
+   subrun=`echo $jobid | cut -f2 -d'_'`
+ fi
+ nevents=${NEVENTS:--1} #Set from env override or -1 
+ NSKIP=${NSKIP:-0} 
+ echo "nevents: $nevents"
+ 
+ overrides="core.data_tier=full-reconstructed \
+  core.application.version=${DUNESW_VERSION} \
+  core.application.name=reco \
+  core.application.family=dunesw \
+  core.application=dunesw.reco \
+ "
+
+#User specifies if they'd like to use an input file or not 
+if [ -n "$MCJob" ]; then
+  inputflag=""
+else
+  inputflag="-i $pfn --parent $did"
+fi
+
+echo "input flag: $inputflag"
+
+if [[ $pfn == *.hdf5 ]]; then
+  echo "Setting LD_PRELOAD"  
+  export LD_PRELOAD=$XROOTD_LIB/libXrdPosixPreload.so
+fi
+
+# TODO -- metadata file configurable
+python -m beam_job_utils run_job \
+      --json ${UTIL_TAR}/${JSONFILE:-pdsp_beam_base_meta.json} \
+      --overrides ${overrides} \
+      --run $run \
+      --subrun $subrun \
+      --yaml ${UTIL_TAR}/${YAMLFILE:-pdsp_beam_gen.yaml} \
+      --nevents $nevents \
+      --event $NSKIP \
+      $inputflag
+
+exitcode=$?
+if [ $exitcode -ne 0 ]; then
+  echo "Error running. Exiting with ${exitcode}"
+  exit $exitcode
+fi
+
+echo "$pfn" > justin-processed-pfns.txt
+
