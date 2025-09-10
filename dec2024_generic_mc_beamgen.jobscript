@@ -72,6 +72,12 @@ a=1
  echo "WIRECELL loc:"
  ups active | grep wirecell
  
+
+ if [ -n "$extra_fcl_path" ]; then
+   export FHICL_FILE_PATH=${extra_fcl_path}:${FHICL_FILE_PATH}
+   echo "Added ${extra_fcl_path} to fhicl file path"
+   echo "${FHICL_FILE_PATH}"
+ fi
  
  echo "printing env"
  env
@@ -137,23 +143,22 @@ else
   inputflag="-i $pfn --parent $did"
 fi
 
-if [[ $ == *.hdf5 ]]; then
-  pre_flag="LD_PRELOAD=$XROOTD_LIB/libXrdPosixPreload.so "
-else
-  pre_flag=""
-fi
-
 echo "input flag: $inputflag"
 
+if [[ $pfn == *.hdf5 ]]; then
+  echo "Setting LD_PRELOAD"  
+  export LD_PRELOAD=$XROOTD_LIB/libXrdPosixPreload.so
+fi
+
 # TODO -- metadata file configurable
-$pre_flag python -m beam_job_utils run_job \
+python -m beam_job_utils run_job \
       --json ${UTIL_TAR}/${JSONFILE:-pdsp_beam_base_meta.json} \
       --overrides ${overrides} \
       --run $run \
       --subrun $subrun \
       --yaml ${UTIL_TAR}/${YAMLFILE:-pdsp_beam_gen.yaml} \
       --nevents $nevents \
-      --event $NSKIP \
+      $(if [ ${NSKIP} -ne 0 ]; then echo "--event ${NSKIP}"; fi) \
       $inputflag
 
 exitcode=$?
