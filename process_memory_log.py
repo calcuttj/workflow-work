@@ -1,4 +1,5 @@
 from argparse import ArgumentParser as ap
+import numpy as np
 # from rucio.client.replicaclient import ReplicaClient
 import h5py as h5
 import matplotlib.pyplot as plt
@@ -38,8 +39,11 @@ if __name__ == '__main__':
         break
 
   if args.o is not None:
-    with h5.File(args.o, 'w') as h5f:
-      h5f.create_dataset('memory', data=memories) 
+    if '.h5' in args.o or '.hdf5' in args.o:
+      with h5.File(args.o, 'w') as h5f:
+        h5f.create_dataset('memory', data=memories) 
+    elif '.npy' in args.o:
+      np.save(args.o, memories)
   
   # if args.vis:
   #  plt.plot(lines) 
