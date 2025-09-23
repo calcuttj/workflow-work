@@ -160,6 +160,7 @@ def run_stage(stage, fcl, input_file, nevents, event, outname, artroot_out=False
   if do_timing:    
     start_time = time.time()
   print(cmd)
+  print('ld_preload', os.environ.copy()['LD_PRELOAD'])
   proc = subprocess.run(
     cmd, capture_output=True,
     env=os.environ.copy(),
