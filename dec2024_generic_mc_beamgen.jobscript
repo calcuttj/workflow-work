@@ -110,7 +110,7 @@ fi
  echo "jobsub_id: ${JUSTIN_JOBSUB_ID:-1}"
  
  #Get run/subrun from parent if using input -- else from justin job ID/process"
- if [ -z "$MCJob" ]; then
+ if [ -z "$SetRun" ]; then
    echo "Getting run subrun from $did"
    run_subrun=`python -m beam_job_utils get_run_subrun -i $did`
    get_run_ret=$?
@@ -166,6 +166,11 @@ if [ $exitcode -ne 0 ]; then
   echo "Error running. Exiting with ${exitcode}"
   exit $exitcode
 fi
+
+echo "lsing"
+ls -lhS
+echo "disk usage"
+du -sh .
 
 echo "$pfn" > justin-processed-pfns.txt
 
