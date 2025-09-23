@@ -3,9 +3,13 @@ from metacat.webapi import MetaCatClient
 import numpy as np
 
 def build_query(args):
-  query = f'files where dune.workflow["workflow_id"] in ({args.w})'
-  query += '' if args.extra is None else f' and {args.extra}'
-  query += '' if args.limit is None else f' limit {args.limit}'
+  if args.query is not None:
+    query = args.query
+  else:
+    ws = ','.join(str(w) for w in args.w)
+    query = f'files where dune.workflow["workflow_id"] in ({ws})'
+    query += '' if args.extra is None else f' and {args.extra}'
+    query += '' if args.limit is None else f' limit {args.limit}'
   return query
   
 def get_seconds(i):
@@ -36,13 +40,14 @@ def print_sizes(sizes, args):
 
 if __name__ == '__main__':
   parser = ap()
-  parser.add_argument('-w', type=int, required=True)
+  parser.add_argument('-w', type=int, required=True, nargs='+')
   parser.add_argument('--limit', type=int, default=None)
   parser.add_argument('--extra', type=str, default=None)
   parser.add_argument('-o', type=str, default=None)
   parser.add_argument('--vis', action='store_true')
   parser.add_argument('--fit', action='store_true')
   parser.add_argument('--mb', action='store_true')
+  parser.add_argument('--query', type=str, default=None)
   args = parser.parse_args()
 
   mc = MetaCatClient()
@@ -51,7 +56,7 @@ if __name__ == '__main__':
   print(query)
 
   files = [f for f in mc.query(query, with_metadata=True)]
-  #print(files[0])
+  print(len(files))
 
   times = get_times(files)
 
