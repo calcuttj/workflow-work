@@ -1,0 +1,232 @@
+#!/bin/sh
+#
+# Example jobscript that runs lar for all the files
+# referred to by the MQL expression given on the justin command line.
+#
+# Submit with something like this:
+#
+# ./justin simple-workflow \
+#  --max-distance 30 \
+#  --mql "rucio-dataset protodune-sp:np04_raw_run_number_5769" \
+#  --jobscript lar.jobscript
+#
+# Then monitor with dashboard or ./justin show-jobs --workflow-id ID
+# where ID is the value printed by the first command
+#
+
+
+# the xroot lib for streaming non-root files is in testproducts, 
+# so add it to the start of the path
+source /cvmfs/dune.opensciencegrid.org/products/dune/setup_dune.sh
+if [ -z ${JUSTIN_PROCESSORS} ]; then
+  JUSTIN_PROCESSORS=1
+fi
+
+echo "Justin processors: ${JUSTIN_PROCESSORS}"
+
+export TF_NUM_THREADS=${JUSTIN_PROCESSORS}   
+export OPENBLAS_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export JULIA_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export MKL_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export NUMEXPR_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export OMP_NUM_THREADS=${JUSTIN_PROCESSORS}  
+
+# From jobsub
+export CLUSTER=${CLUSTER:-1}
+export PROCESS=${PROCESS:-1}
+
+setup dunesw ${DUNESW_VERSION:-v10_10_04d00} -q e26:prof
+setup_exit=$?
+if [ "$setup_exit" != 0 ]; then
+  echo "Error setting up dunesw ${DUNESW_VERSION}"
+  exit
+fi
+
+# Get an unprocessed file from this stage
+did_pfn_rse=`$JUSTIN_PATH/justin-get-file`
+did=`echo $did_pfn_rse | cut -f1 -d' '`
+pfn=`echo $did_pfn_rse | cut -f2 -d' '`
+rse=`echo $did_pfn_rse | cut -f3 -d' '`
+name_only=$(echo $did | cut -f2 -d':')
+echo "name" $name_only
+
+
+echo "Found input file URL $pfn at $rse"
+
+#Get the stage and momentum 
+export stage=${stage:-"Gen"}
+export momentum=${momentum:-1}
+
+if [ "$momentum" == 1 ]; then
+  export gen_fcl="pdhd_1GeV_h4input_cosmics.fcl"
+elif [ "$momentum" == 5 ]; then
+  export gen_fcl="pdhd_5GeV_h4input_cosmics.fcl"
+else
+  echo "Error. Provided invalid momentum: ${momentum}. Can only use 1 or 5"
+  exit 1
+fi
+echo "Using gen fcl: ${gen_fcl}"
+
+now=$(date -u +"%Y%m%dT%H%M%SZ")
+jobid=`echo "${JUSTIN_JOBSUB_ID:-1}" | cut -f1 -d'@' | sed -e "s/\./_/"`
+stageid=${JUSTIN_STAGE_ID:-1}
+output_preamble="pdhd_prod_beam_"
+
+nevents=${nevents:--1}
+nskip=${nskip:-0}
+echo "RUNNING STAGE ${stage}"
+#-------------- GEN STAGE --------------------
+if [ "$stage" == "Gen" ]; then
+  if [[ $nevents -gt 10 || $nevents -lt 1 ]]; then
+    echo "Setting nevents to 10 in gen"
+    nevents=10
+  fi
+  #Generation
+  LD_PRELOAD=$XROOTD_LIB/libXrdPosixPreload.so lar \
+      -n  ${nevents} \
+      --nskip ${nskip} \
+      -c  ${gen_fcl} \
+      -o temp_gen.root \
+      $pfn
+
+  larReturnCode=$?
+  echo "gen lar returns $larReturnCode"
+  if [ "$larReturnCode" != 0 ] ; then
+    exit $larReturnCode
+  fi
+  #Generation Done
+
+  #G4
+  lar \
+      -c  standard_g4_protodunehd_stage1.fcl \
+      -o temp_largeant.root \
+      temp_gen.root
+
+  larReturnCode=$?
+  echo "g4 lar returns $larReturnCode"
+  if [ "$larReturnCode" != 0 ] ; then
+    exit $larReturnCode
+  fi
+  #G4 Done
+
+  #IonScintPDExt
+  lar \
+      -c  standard_g4_protodunehd_IonScint_PDExt.fcl \
+      -o ${output_preamble}_${jobid}_${stageid}_${now}_gen_g4_IonScintPDExt.root \
+      temp_largeant.root
+
+  larReturnCode=$?
+  echo "ionscint pdext lar returns $larReturnCode"
+  if [ "$larReturnCode" != 0 ] ; then
+    exit $larReturnCode
+  fi
+  #IonScintPDExt Done
+#---------------------------------------------
+
+#-------------- PD STAGE --------------------
+elif [ "$stage" = "PD" ]; then 
+  #TPC1
+  lar \
+      -n ${nevents} \
+      --nskip ${nskip} \
+      -c  standard_g4_protodunehd_PDInt_TPC1.fcl \
+      -o temp_PD_TPC1.root \
+      $pfn
+
+  larReturnCode=$?
+  echo "PD TPC1 returns $larReturnCode"
+  if [ "$larReturnCode" != 0 ] ; then
+    exit $larReturnCode
+  fi
+  #TPC1 Done
+
+  #TPC2
+  lar \
+      -c  standard_g4_protodunehd_PDInt_TPC2.fcl \
+      -o temp_PD_TPC2.root \
+      temp_PD_TPC1.root
+
+  larReturnCode=$?
+  echo "PD TPC2 returns $larReturnCode"
+  if [ "$larReturnCode" != 0 ] ; then
+    exit $larReturnCode
+  fi
+  #TPC2 Done
+
+  #TPC5
+  lar \
+      -c  standard_g4_protodunehd_PDInt_TPC5.fcl \
+      -o temp_PD_TPC5.root \
+      temp_PD_TPC2.root
+
+  larReturnCode=$?
+  echo "PD TPC5 returns $larReturnCode"
+  if [ "$larReturnCode" != 0 ] ; then
+    exit $larReturnCode
+  fi
+  #TPC5 Done
+
+  #TPC6
+  lar \
+      -c  standard_g4_protodunehd_PDInt_TPC6.fcl \
+      -o ${name_only}_${jobid}_${stageid}_${now}_PDInt.root \
+      temp_PD_TPC5.root
+
+  larReturnCode=$?
+  echo "PD TPC6 returns $larReturnCode"
+  if [ "$larReturnCode" != 0 ] ; then
+    exit $larReturnCode
+  fi
+  #TPC6 Done
+#--------------------------------------------
+
+#-------------- DetsimReco STAGE --------------------
+elif [ "$stage" == "DetsimReco" ]; then
+  #Detsim
+  lar \
+      -n ${nevents} \
+      --nskip ${nskip} \
+      -c  standard_detsim_protodunehd.fcl \
+      -o temp_detsim.root \
+      $pfn
+
+  larReturnCode=$?
+  echo "Detsim returns $larReturnCode"
+  if [ "$larReturnCode" != 0 ] ; then
+    exit $larReturnCode
+  fi
+  #Detsim Done
+
+
+  #Reco
+  lar \
+      -c  standard_reco_protodunehd_MC.fcl \
+      -o ${name_only}_${jobid}_${stageid}_${now}_detsim_reco1.root \
+      temp_detsim.root
+
+  larReturnCode=$?
+  echo "Reco returns $larReturnCode"
+  if [ "$larReturnCode" != 0 ] ; then
+    exit $larReturnCode
+  fi
+  #Reco Done
+
+else
+  echo "pass"
+fi
+
+
+# Record that we processed the input file ok (did we???)
+echo "$pfn" > justin-processed-pfns.txt
+
+# For debugging
+for i in *.json
+do
+  echo "==== Start $i ===="
+  cat $i
+  echo "==== End $i ===="
+done
+
+ls -ltR
+
+exit 0
