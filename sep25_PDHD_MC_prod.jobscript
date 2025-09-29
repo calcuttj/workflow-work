@@ -212,7 +212,8 @@ elif [ "$stage" == "DetsimReco" ]; then
   #Reco Done
 
 else
-  echo "pass"
+  echo "ERROR. Provided invalid stage ${stage}. Can only provide one of: (Gen, PD, DetsimReco)"
+  exit 3
 fi
 
 
