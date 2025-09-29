@@ -216,6 +216,8 @@ else
   exit 3
 fi
 
+####EDIT METADATA FOR THE FOLLOWING FILE
+#${name_only}_${jobid}_${stageid}_${now}_detsim_reco1.root
 
 # Record that we processed the input file ok (did we???)
 echo "$pfn" > justin-processed-pfns.txt
