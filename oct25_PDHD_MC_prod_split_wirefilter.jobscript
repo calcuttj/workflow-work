@@ -42,6 +42,13 @@ if [ "$setup_exit" != 0 ]; then
   exit
 fi
 
+
+if [ -n "${extra_fcl_path}" ]; then
+  echo "ADDING ${extra_fcl_path} to fcl file path"
+  sleep 1
+  export FHICL_FILE_PATH=${extra_fcl_path}:${FHICL_FILE_PATH}
+fi
+
 # Get an unprocessed file from this stage
 did_pfn_rse=`$JUSTIN_PATH/justin-get-file`
 if [ "${did_pfn_rse}" == "" ] ; then
@@ -187,6 +194,7 @@ elif [ "$stage" = "PD" ]; then
 
 #-------------- DetsimReco STAGE --------------------
 elif [ "$stage" == "DetsimReco" ]; then
+
   #Detsim
   lar \
       -n ${nevents} \
@@ -203,9 +211,11 @@ elif [ "$stage" == "DetsimReco" ]; then
   #Detsim Done
 
 
+  reco_fcl=${reco_fcl:-standard_reco_protodunehd_MC.fcl}
+
   #Reco
   lar \
-      -c  standard_reco_protodunehd_MC.fcl \
+      -c  ${reco_fcl} \
       -o ${name_only}_${jobid}_${stageid}_${now}_detsim_reco1.root \
       temp_detsim.root
 
