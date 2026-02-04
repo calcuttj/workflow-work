@@ -1,0 +1,62 @@
+#!/bin/bash
+
+###
+# To run, provide the following environment variables
+# lardon_container -- path on cvmfs to the unpacked lardon container sandbox. Need to make sure it's the top level of the sandbox
+# lardon_script -- Quickly, I could only figure out to get this running in a standalone script. See "lardon_mini.sh" and edit it or replace it accordingly
+#               -- Then upload it to cvmfs and point directly to it
+# lardon_out -- whatever you want to tag the output files with. Dfeault to "lardon_out"
+###
+
+
+#SETUP STUFF HERE
+if [ -z ${JUSTIN_PROCESSORS} ]; then
+  JUSTIN_PROCESSORS=1
+fi
+
+echo "Justin processors: ${JUSTIN_PROCESSORS}"
+
+export TF_NUM_THREADS=${JUSTIN_PROCESSORS}   
+export OPENBLAS_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export JULIA_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export MKL_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export NUMEXPR_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export OMP_NUM_THREADS=${JUSTIN_PROCESSORS}  
+
+echo "Justin specific env vars"
+env | grep JUSTIN
+now=$(date -u +"%Y%m%dT%H%M%SZ")
+jobid=`echo "${JUSTIN_JOBSUB_ID:-1}" | cut -f1 -d'@' | sed -e "s/\./_/"`
+stageid=${JUSTIN_STAGE_ID:-1}
+
+echo "Will use justin-get-file"
+DID_PFN_RSE=`$JUSTIN_PATH/justin-get-file`
+if [ "${DID_PFN_RSE}" == "" ] ; then
+  echo "Could not get file"
+  exit 0
+fi
+pfn=`echo ${DID_PFN_RSE} | cut -f2 -d' '`
+did=`echo ${DID_PFN_RSE} | cut -f1 -d' '`
+
+input_filename=`echo $did | cut -f2 -d':'`
+echo "input file: $input_filename"
+
+apptainer exec \
+  --cleanenv \
+  ${lardon_container} \
+  ${lardon_script} \
+  $pfn ${lardon_output:-"lardon_out"} #These are ordered according to what's defined in $lardon_script
+
+exitcode=$?
+if [ $exitcode -ne 0 ]; then
+  echo "Error running. Exiting with ${exitcode}"
+  exit $exitcode
+fi
+
+echo "lsing"
+ls -lhS
+echo "disk usage"
+du -sh .
+
+#THIS TELLS JUSTIN THIS FILE WAS SUCCESSFULLY PROCESSED
+echo "$pfn" > justin-processed-pfns.txt
