@@ -1,0 +1,117 @@
+#!/bin/bash
+#
+if [ -z $gallery_path ]; then
+        echo "fatal. must provide path to gallery scripts as '--env gallery_path=<path>'"
+        exit 1
+fi
+
+source /cvmfs/dune.opensciencegrid.org/products/dune/setup_dune.sh
+
+if [ -z ${JUSTIN_PROCESSORS} ]; then
+  JUSTIN_PROCESSORS=1
+fi
+
+
+echo "Justin processors: ${JUSTIN_PROCESSORS}"
+
+export TF_NUM_THREADS=${JUSTIN_PROCESSORS}   
+export OPENBLAS_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export JULIA_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export MKL_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export NUMEXPR_NUM_THREADS=${JUSTIN_PROCESSORS} 
+export OMP_NUM_THREADS=${JUSTIN_PROCESSORS}  
+
+echo "Justin specific env vars"
+env | grep JUSTIN
+now=$(date -u +"%Y%m%dT%H%M%SZ")
+ DUNESW_VERSION=${DUNESW_VERSION:-v10_17_01d00}
+ setup dunesw \
+    "${DUNESW_VERSION}" \
+    -q "${DUNE_QUALIFIER:-e26:prof}"
+ 
+ setup_exit=$?
+ if [ $? -ne 0 ]; then
+   echo "Failed to setup dunesw $DUNESW_VERSION $DUNE_QUALIFIER"
+   exit $setup_exit
+ fi
+ 
+ if [ -n "$extra_fcl_path" ]; then
+   export FHICL_FILE_PATH=${extra_fcl_path}:${FHICL_FILE_PATH}
+   echo "Added ${extra_fcl_path} to fhicl file path"
+   echo "${FHICL_FILE_PATH}"
+ fi
+
+
+NFILES=${NFILES:-1}
+files=()
+nfiles=0
+
+if [ -n "${TESTFILE}" ]; then
+  echo "Using testfile"
+  files+=(${TESTFILE})
+  nfiles=1
+else
+  nfiles=0
+  for i in `seq 1 ${NFILES:-1}`; do
+    echo $i
+    DID_PFN_RSE=`$JUSTIN_PATH/justin-get-file`
+
+    if [ "${DID_PFN_RSE}" == "" ] ; then
+      echo "Could not get file -- exiting loop"
+      break
+    fi
+
+    echo "did_pfn_rse: ${DID_PFN_RSE}"
+
+    THISFILE=`echo ${DID_PFN_RSE} | cut -f2 -d' '`
+
+    echo $THISFILE
+    files+=(${THISFILE})
+    nfiles=$(( nfiles + 1 ))
+  done
+fi
+
+echo "Got $nfiles Files"
+echo ${files[@]}
+
+
+
+if [ $nfiles -eq 0 ]; then
+  echo "Got no files. Exiting safely"
+  exit
+fi
+echo "Joining files"
+printf -v joined '%s,' "${files[@]}"
+file_list="${joined%,}"
+
+echo "Justin specific env vars"
+env | grep JUSTIN
+now=$(date -u +"%Y%m%dT%H%M%SZ")
+jobid=`echo "${JUSTIN_JOBSUB_ID:-1}" | cut -f1 -d'@' | sed -e "s/\./_/"`
+stageid=${JUSTIN_STAGE_ID:-1}
+
+fcl_file=${fhicl_file:-"pdvd_1GeV_h2input_cosmics.fcl"}
+
+#Run larsoft
+lar -c $fcl_file -s ${files[@]} -o prod_events.root
+lar_exit=$?
+
+if [ $lar_exit -ne 0 ]; then
+  echo "Error in lar. Exiting"
+  exit $lar_exit
+fi
+
+export PYTHONPATH=$gallery_path:$PYTHONPATH
+
+python -m generator -f prod_events.root -o beam_decode_${jobid}_${stageid}.npz
+gallery_exit=$?
+
+if [ $gallery_exit -ne 0 ]; then
+  echo "Error in gallery/python script. Exiting"
+  exit $gallery_exit
+fi
+
+#echo "$pfn" > justin-processed-pfns.txt
+for i in ${files[@]}; do
+  echo "${i}" >> justin-processed-pfns.txt
+done
